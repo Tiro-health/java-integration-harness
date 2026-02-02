@@ -5,7 +5,6 @@ A Java port of the [SMARTWebEHR](https://github.com/Tiro-health/SMARTWebEHR) .NE
 ## Features
 
 - Parse and handle SMART Web Messaging messages
-- Scratchpad operations (create, read, update, delete)
 - SDC (Structured Data Capture) operations
 - Form submission handling
 - Event-driven architecture
@@ -41,12 +40,6 @@ handler.addListener(new SmartMessageListener() {
         QuestionnaireResponse response = event.getResponse();
         OperationOutcome outcome = event.getOutcome();
         // Process the submitted form
-    }
-
-    @Override
-    public void onResourceChanged(ResourceChangedEvent event) {
-        Resource resource = event.getResource();
-        // Handle resource changes
     }
 
     @Override
@@ -186,28 +179,9 @@ handler.sendSdcConfigureContextAsync(
 );
 ```
 
-### Accessing the Scratchpad
-
-```java
-Scratchpad scratchpad = handler.getScratchpad();
-
-// Get all resources
-Collection<Resource> resources = scratchpad.getAllResources();
-
-// Get specific resource
-Resource resource = scratchpad.getResource("Patient/123");
-
-// Clear scratchpad
-scratchpad.clear();
-```
-
 ## Message Types Supported
 
 ### Inbound (from WebView)
-- `scratchpad.create` - Create a resource in the scratchpad
-- `scratchpad.read` - Read resource(s) from the scratchpad
-- `scratchpad.update` - Update a resource in the scratchpad
-- `scratchpad.delete` - Delete a resource from the scratchpad
 - `status.handshake` - Handshake from embedded app
 - `form.submitted` - Form submission with QuestionnaireResponse
 - `ui.done` - Application close request

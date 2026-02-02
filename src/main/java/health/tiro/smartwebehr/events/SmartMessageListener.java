@@ -4,11 +4,6 @@ package health.tiro.smartwebehr.events;
  * Listener interface for SMART Web Messaging events.
  */
 public interface SmartMessageListener {
-    
-    /**
-     * Called when a FHIR resource is created or updated.
-     */
-    default void onResourceChanged(ResourceChangedEvent event) {}
 
     /**
      * Called when a form is submitted.
