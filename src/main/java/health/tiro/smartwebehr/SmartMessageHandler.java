@@ -39,7 +39,6 @@ public class SmartMessageHandler {
      */
     private static volatile FhirContext sharedFhirContext;
 
-    private final Scratchpad scratchpad = new Scratchpad();
     private final ObjectMapper objectMapper;
     private final FhirContext fhirContext;
     private final IParser fhirJsonParser;
@@ -165,28 +164,7 @@ public class SmartMessageHandler {
             JsonNode payload = message.getPayload();
             
             switch (messageType) {
-                case "scratchpad.create":
-                    logger.debug("Handling scratchpad.create request.");
-                    response = handleScratchpadCreate(message, parseResourcePayload(payload, "resource"));
-                    break;
-                    
-                case "scratchpad.update":
-                    logger.debug("Handling scratchpad.update request.");
-                    response = handleScratchpadUpdate(message, parseResourcePayload(payload, "resource"));
-                    break;
-                    
-                case "scratchpad.delete":
-                    logger.debug("Handling scratchpad.delete request.");
-                    response = handleScratchpadDelete(message, payload.get("location").asText());
-                    break;
-                    
-                case "scratchpad.read":
-                    logger.debug("Handling scratchpad.read request.");
-                    String location = payload.has("location") && !payload.get("location").isNull() 
-                        ? payload.get("location").asText() : null;
-                    response = handleScratchpadRead(message, location);
-                    break;
-                    
+
                 case "status.handshake":
                     logger.debug("Handling status.handshake request.");
                     response = handleHandshake(message);
@@ -252,69 +230,6 @@ public class SmartMessageHandler {
         return (Resource) fhirJsonParser.parseResource(resourceNode.toString());
     }
 
-    private SmartMessageResponse handleScratchpadCreate(SmartMessageRequest message, Resource resource) {
-        String location = scratchpad.createResource(resource);
-        
-        // Fire ResourceChangedEvent
-        ResourceChangedEvent event = new ResourceChangedEvent(this, resource);
-        listeners.forEach(l -> l.onResourceChanged(event));
-        logger.debug("ResourceChanged event invoked for MessageId: {}", message.getMessageId());
-        
-        return new SmartMessageResponse(
-            UUID.randomUUID().toString(),
-            message.getMessageId(),
-            false,
-            new ScratchpadCreateResponse("201 Created", location, null)
-        );
-    }
-
-    private SmartMessageResponse handleScratchpadUpdate(SmartMessageRequest message, Resource resource) {
-        scratchpad.updateResource(resource);
-        
-        // Fire ResourceChangedEvent
-        ResourceChangedEvent event = new ResourceChangedEvent(this, resource);
-        listeners.forEach(l -> l.onResourceChanged(event));
-        logger.debug("ResourceChanged event invoked for MessageId: {}", message.getMessageId());
-        
-        return new SmartMessageResponse(
-            UUID.randomUUID().toString(),
-            message.getMessageId(),
-            false,
-            new ScratchpadUpdateResponse("200 OK", null)
-        );
-    }
-
-    private SmartMessageResponse handleScratchpadDelete(SmartMessageRequest message, String location) {
-        scratchpad.deleteResource(location);
-        
-        return new SmartMessageResponse(
-            UUID.randomUUID().toString(),
-            message.getMessageId(),
-            false,
-            new ScratchpadDeleteResponse("200 OK", null)
-        );
-    }
-
-    private SmartMessageResponse handleScratchpadRead(SmartMessageRequest message, String location) {
-        if (location == null) {
-            List<Resource> resources = new ArrayList<>(scratchpad.getAllResources());
-            return new SmartMessageResponse(
-                UUID.randomUUID().toString(),
-                message.getMessageId(),
-                false,
-                new ScratchpadReadResponse(null, resources, null)
-            );
-        } else {
-            Resource resource = scratchpad.getResource(location);
-            return new SmartMessageResponse(
-                UUID.randomUUID().toString(),
-                message.getMessageId(),
-                false,
-                new ScratchpadReadResponse(resource, null, null)
-            );
-        }
-    }
-
     private SmartMessageResponse handleHandshake(SmartMessageRequest message) {
         logger.debug("Invoking HandshakeReceived event for MessageId: {}", message.getMessageId());
         
@@ -376,23 +291,7 @@ public class SmartMessageHandler {
             ResponsePayload payload = response.getPayload();
             if (payload != null) {
                 ObjectNode payloadNode = objectMapper.valueToTree(payload);
-                
-                // Handle FHIR resources in payload
-                if (payload instanceof ScratchpadReadResponse) {
-                    ScratchpadReadResponse readResponse = (ScratchpadReadResponse) payload;
-                    if (readResponse.getResource() != null) {
-                        String resourceJson = fhirJsonParser.encodeResourceToString(readResponse.getResource());
-                        payloadNode.set("resource", objectMapper.readTree(resourceJson));
-                    }
-                    if (readResponse.getScratchpad() != null) {
-                        ArrayNode scratchpadArray = objectMapper.createArrayNode();
-                        for (Resource r : readResponse.getScratchpad()) {
-                            String resourceJson = fhirJsonParser.encodeResourceToString(r);
-                            scratchpadArray.add(objectMapper.readTree(resourceJson));
-                        }
-                        payloadNode.set("scratchpad", scratchpadArray);
-                    }
-                }
+
                 
                 node.set("payload", payloadNode);
             }
@@ -413,26 +312,20 @@ public class SmartMessageHandler {
 
     public CompletableFuture<String> sendMessageAsync(String messageType, RequestPayload payload, Consumer<SmartMessageResponse> responseHandler) {
         logger.info("Sending message async: MessageType={}", messageType);
-        
+
         if (messageSender == null) {
             throw new IllegalStateException("MessageSender must be set before sending messages");
         }
-        
+
         String messageId = UUID.randomUUID().toString();
-        SmartMessageRequest message = new SmartMessageRequest(
-            messageId,
-            "smart-web-messaging",
-            messageType,
-            payload != null ? objectMapper.valueToTree(payload) : objectMapper.createObjectNode()
-        );
-        
+
         if (responseHandler != null) {
             responseListeners.put(messageId, responseHandler);
             logger.debug("Registered response listener for MessageId: {}", messageId);
         }
-        
+
         try {
-            String requestJson = objectMapper.writeValueAsString(message);
+            String requestJson = serializeRequest(messageId, messageType, payload);
             logger.debug("Sending JSON message: {}", requestJson);
             return messageSender.sendMessage(requestJson);
         } catch (JsonProcessingException e) {
@@ -441,6 +334,128 @@ public class SmartMessageHandler {
             future.completeExceptionally(e);
             return future;
         }
+    }
+
+    private String serializeRequest(String messageId, String messageType, RequestPayload payload) throws JsonProcessingException {
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("messageId", messageId);
+        node.put("messagingHandle", "smart-web-messaging");
+        node.put("messageType", messageType);
+
+        if (payload == null) {
+            node.set("payload", objectMapper.createObjectNode());
+        } else if (payload instanceof SdcDisplayQuestionnaire) {
+            node.set("payload", serializeSdcDisplayQuestionnaire((SdcDisplayQuestionnaire) payload));
+        } else if (payload instanceof SdcConfigureContext) {
+            node.set("payload", serializeSdcConfigureContext((SdcConfigureContext) payload));
+        } else {
+            node.set("payload", objectMapper.valueToTree(payload));
+        }
+
+        return objectMapper.writeValueAsString(node);
+    }
+
+    private ObjectNode serializeSdcDisplayQuestionnaire(SdcDisplayQuestionnaire payload) throws JsonProcessingException {
+        ObjectNode node = objectMapper.createObjectNode();
+
+        // Handle questionnaire (can be String, Reference, or Questionnaire)
+        Object questionnaire = payload.getQuestionnaire();
+        if (questionnaire instanceof String) {
+            node.put("questionnaire", (String) questionnaire);
+        } else if (questionnaire instanceof Resource) {
+            String json = fhirJsonParser.encodeResourceToString((Resource) questionnaire);
+            node.set("questionnaire", objectMapper.readTree(json));
+        } else if (questionnaire instanceof Reference) {
+            node.set("questionnaire", serializeReference((Reference) questionnaire));
+        }
+
+        // Handle questionnaireResponse
+        if (payload.getQuestionnaireResponse() != null) {
+            String json = fhirJsonParser.encodeResourceToString(payload.getQuestionnaireResponse());
+            node.set("questionnaireResponse", objectMapper.readTree(json));
+        }
+
+        // Handle context
+        if (payload.getContext() != null) {
+            node.set("context", serializeSdcDisplayQuestionnaireContext(payload.getContext()));
+        }
+
+        return node;
+    }
+
+    private ObjectNode serializeSdcDisplayQuestionnaireContext(SdcDisplayQuestionnaire.SdcDisplayQuestionnaireContext context) throws JsonProcessingException {
+        ObjectNode node = objectMapper.createObjectNode();
+
+        if (context.getSubject() != null) {
+            node.set("subject", serializeReference(context.getSubject()));
+        }
+        if (context.getAuthor() != null) {
+            node.set("author", serializeReference(context.getAuthor()));
+        }
+        if (context.getEncounter() != null) {
+            node.set("encounter", serializeReference(context.getEncounter()));
+        }
+        if (context.getLaunchContext() != null && !context.getLaunchContext().isEmpty()) {
+            ArrayNode launchContextArray = objectMapper.createArrayNode();
+            for (LaunchContext lc : context.getLaunchContext()) {
+                launchContextArray.add(serializeLaunchContext(lc));
+            }
+            node.set("launchContext", launchContextArray);
+        }
+
+        return node;
+    }
+
+    private ObjectNode serializeSdcConfigureContext(SdcConfigureContext payload) throws JsonProcessingException {
+        ObjectNode node = objectMapper.createObjectNode();
+
+        if (payload.getSubject() != null) {
+            node.set("subject", serializeReference(payload.getSubject()));
+        }
+        if (payload.getAuthor() != null) {
+            node.set("author", serializeReference(payload.getAuthor()));
+        }
+        if (payload.getEncounter() != null) {
+            node.set("encounter", serializeReference(payload.getEncounter()));
+        }
+        if (payload.getLaunchContext() != null && !payload.getLaunchContext().isEmpty()) {
+            ArrayNode launchContextArray = objectMapper.createArrayNode();
+            for (LaunchContext lc : payload.getLaunchContext()) {
+                launchContextArray.add(serializeLaunchContext(lc));
+            }
+            node.set("launchContext", launchContextArray);
+        }
+
+        return node;
+    }
+
+    private ObjectNode serializeLaunchContext(LaunchContext lc) throws JsonProcessingException {
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("name", lc.getName());
+
+        if (lc.getContentReference() != null) {
+            node.set("contentReference", serializeReference(lc.getContentReference()));
+        }
+        if (lc.getContentResource() != null) {
+            String json = fhirJsonParser.encodeResourceToString(lc.getContentResource());
+            node.set("contentResource", objectMapper.readTree(json));
+        }
+
+        return node;
+    }
+
+    private ObjectNode serializeReference(Reference ref) {
+        ObjectNode node = objectMapper.createObjectNode();
+        if (ref.getReference() != null) {
+            node.put("reference", ref.getReference());
+        }
+        if (ref.getType() != null) {
+            node.put("type", ref.getType());
+        }
+        if (ref.getDisplay() != null) {
+            node.put("display", ref.getDisplay());
+        }
+        return node;
     }
 
     public CompletableFuture<String> sendFormRequestSubmitAsync(Consumer<SmartMessageResponse> responseHandler) {
@@ -594,9 +609,6 @@ public class SmartMessageHandler {
 
     // ========== Getters ==========
 
-    public Scratchpad getScratchpad() {
-        return scratchpad;
-    }
 
     public ObjectMapper getObjectMapper() {
         return objectMapper;

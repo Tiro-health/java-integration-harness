@@ -5,15 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import health.tiro.smartwebehr.events.CloseApplicationEvent;
 import health.tiro.smartwebehr.events.FormSubmittedEvent;
 import health.tiro.smartwebehr.events.HandshakeReceivedEvent;
-import health.tiro.smartwebehr.events.ResourceChangedEvent;
 import health.tiro.smartwebehr.events.SmartMessageListener;
-import org.hl7.fhir.r4.model.Observation;
-import org.hl7.fhir.r4.model.QuestionnaireResponse;
+import health.tiro.smartwebehr.message.SmartMessageResponse;
+import health.tiro.smartwebehr.message.payload.LaunchContext;
+import org.hl7.fhir.r4.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,233 +54,6 @@ class SmartMessageHandlerTest {
         assertEquals("msg-123", responseNode.get("responseToMessageId").asText());
         assertFalse(responseNode.get("additionalResponsesExpected").asBoolean());
         assertNotNull(receivedEvent.get());
-    }
-
-    @Test
-    void handleScratchpadCreateRequest() throws Exception {
-        String request = "{"
-                + "\"messageId\": \"msg-456\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.create\","
-                + "\"payload\": {"
-                + "  \"resource\": {"
-                + "    \"resourceType\": \"Observation\","
-                + "    \"status\": \"final\","
-                + "    \"code\": {"
-                + "      \"coding\": [{"
-                + "        \"system\": \"http://loinc.org\","
-                + "        \"code\": \"8867-4\","
-                + "        \"display\": \"Heart rate\""
-                + "      }]"
-                + "    }"
-                + "  }"
-                + "}"
-                + "}";
-
-        List<ResourceChangedEvent> events = new ArrayList<>();
-        handler.addListener(new SmartMessageListener() {
-            @Override
-            public void onResourceChanged(ResourceChangedEvent event) {
-                events.add(event);
-            }
-        });
-
-        String response = handler.handleMessage(request);
-
-        assertNotNull(response);
-        JsonNode responseNode = objectMapper.readTree(response);
-        assertEquals("msg-456", responseNode.get("responseToMessageId").asText());
-        assertEquals("201 Created", responseNode.get("payload").get("status").asText());
-        assertNotNull(responseNode.get("payload").get("location").asText());
-        assertTrue(responseNode.get("payload").get("location").asText().startsWith("Observation/"));
-
-        assertEquals(1, events.size());
-        assertTrue(events.get(0).getResource() instanceof Observation);
-
-        assertEquals(1, handler.getScratchpad().size());
-    }
-
-    @Test
-    void handleScratchpadUpdateRequest() throws Exception {
-        // First create a resource
-        String createRequest = "{"
-                + "\"messageId\": \"msg-create\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.create\","
-                + "\"payload\": {"
-                + "  \"resource\": {"
-                + "    \"resourceType\": \"Observation\","
-                + "    \"status\": \"preliminary\","
-                + "    \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8867-4\"}]}"
-                + "  }"
-                + "}"
-                + "}";
-        String createResponse = handler.handleMessage(createRequest);
-        JsonNode createResponseNode = objectMapper.readTree(createResponse);
-        String location = createResponseNode.get("payload").get("location").asText();
-        String id = location.substring(location.lastIndexOf('/') + 1);
-
-        // Now update it using the ID from create response
-        String updateRequest = "{"
-                + "\"messageId\": \"msg-update\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.update\","
-                + "\"payload\": {"
-                + "  \"resource\": {"
-                + "    \"resourceType\": \"Observation\","
-                + "    \"id\": \"" + id + "\","
-                + "    \"status\": \"final\","
-                + "    \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8867-4\"}]}"
-                + "  }"
-                + "}"
-                + "}";
-
-        List<ResourceChangedEvent> events = new ArrayList<>();
-        handler.addListener(new SmartMessageListener() {
-            @Override
-            public void onResourceChanged(ResourceChangedEvent event) {
-                events.add(event);
-            }
-        });
-
-        String response = handler.handleMessage(updateRequest);
-
-        assertNotNull(response);
-        JsonNode responseNode = objectMapper.readTree(response);
-        assertEquals("msg-update", responseNode.get("responseToMessageId").asText());
-        assertEquals("200 OK", responseNode.get("payload").get("status").asText());
-
-        assertEquals(1, events.size());
-        Observation updated = (Observation) events.get(0).getResource();
-        assertEquals(Observation.ObservationStatus.FINAL, updated.getStatus());
-    }
-
-    @Test
-    void handleScratchpadDeleteRequest() throws Exception {
-        // First create a resource
-        String createRequest = "{"
-                + "\"messageId\": \"msg-create\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.create\","
-                + "\"payload\": {"
-                + "  \"resource\": {"
-                + "    \"resourceType\": \"Observation\","
-                + "    \"status\": \"final\","
-                + "    \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8867-4\"}]}"
-                + "  }"
-                + "}"
-                + "}";
-        String createResponse = handler.handleMessage(createRequest);
-        JsonNode createResponseNode = objectMapper.readTree(createResponse);
-        String location = createResponseNode.get("payload").get("location").asText();
-        assertEquals(1, handler.getScratchpad().size());
-
-        // Now delete it using the location from create response
-        String deleteRequest = "{"
-                + "\"messageId\": \"msg-delete\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.delete\","
-                + "\"payload\": {"
-                + "  \"location\": \"" + location + "\""
-                + "}"
-                + "}";
-
-        String response = handler.handleMessage(deleteRequest);
-
-        assertNotNull(response);
-        JsonNode responseNode = objectMapper.readTree(response);
-        assertEquals("msg-delete", responseNode.get("responseToMessageId").asText());
-        assertEquals("200 OK", responseNode.get("payload").get("status").asText());
-
-        assertEquals(0, handler.getScratchpad().size());
-    }
-
-    @Test
-    void handleScratchpadReadSingleResource() throws Exception {
-        // First create a resource
-        String createRequest = "{"
-                + "\"messageId\": \"msg-create\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.create\","
-                + "\"payload\": {"
-                + "  \"resource\": {"
-                + "    \"resourceType\": \"Observation\","
-                + "    \"status\": \"final\","
-                + "    \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8867-4\"}]}"
-                + "  }"
-                + "}"
-                + "}";
-        String createResponse = handler.handleMessage(createRequest);
-        JsonNode createResponseNode = objectMapper.readTree(createResponse);
-        String location = createResponseNode.get("payload").get("location").asText();
-
-        // Now read it using the location from create response
-        String readRequest = "{"
-                + "\"messageId\": \"msg-read\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.read\","
-                + "\"payload\": {"
-                + "  \"location\": \"" + location + "\""
-                + "}"
-                + "}";
-
-        String response = handler.handleMessage(readRequest);
-
-        assertNotNull(response);
-        JsonNode responseNode = objectMapper.readTree(response);
-        assertEquals("msg-read", responseNode.get("responseToMessageId").asText());
-        assertNotNull(responseNode.get("payload").get("resource"));
-        assertEquals("Observation", responseNode.get("payload").get("resource").get("resourceType").asText());
-    }
-
-    @Test
-    void handleScratchpadReadAllResources() throws Exception {
-        // Create two resources (without IDs, let the scratchpad assign them)
-        String createRequest1 = "{"
-                + "\"messageId\": \"msg-create-1\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.create\","
-                + "\"payload\": {"
-                + "  \"resource\": {"
-                + "    \"resourceType\": \"Observation\","
-                + "    \"status\": \"final\","
-                + "    \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8867-4\"}]}"
-                + "  }"
-                + "}"
-                + "}";
-        String createRequest2 = "{"
-                + "\"messageId\": \"msg-create-2\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.create\","
-                + "\"payload\": {"
-                + "  \"resource\": {"
-                + "    \"resourceType\": \"Observation\","
-                + "    \"status\": \"preliminary\","
-                + "    \"code\": {\"coding\": [{\"system\": \"http://loinc.org\", \"code\": \"8310-5\"}]}"
-                + "  }"
-                + "}"
-                + "}";
-        handler.handleMessage(createRequest1);
-        handler.handleMessage(createRequest2);
-
-        // Read all (no location)
-        String readRequest = "{"
-                + "\"messageId\": \"msg-read-all\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.read\","
-                + "\"payload\": {"
-                + "  \"location\": null"
-                + "}"
-                + "}";
-
-        String response = handler.handleMessage(readRequest);
-
-        assertNotNull(response);
-        JsonNode responseNode = objectMapper.readTree(response);
-        assertEquals("msg-read-all", responseNode.get("responseToMessageId").asText());
-        assertNotNull(responseNode.get("payload").get("scratchpad"));
-        assertTrue(responseNode.get("payload").get("scratchpad").isArray());
-        assertEquals(2, responseNode.get("payload").get("scratchpad").size());
     }
 
     @Test
@@ -371,23 +145,6 @@ class SmartMessageHandlerTest {
     }
 
     @Test
-    void handleMissingResourceInPayload() throws Exception {
-        String request = "{"
-                + "\"messageId\": \"msg-missing\","
-                + "\"messagingHandle\": \"smart-web-messaging\","
-                + "\"messageType\": \"scratchpad.create\","
-                + "\"payload\": {}"
-                + "}";
-
-        String response = handler.handleMessage(request);
-
-        assertNotNull(response);
-        JsonNode responseNode = objectMapper.readTree(response);
-        assertEquals("msg-missing", responseNode.get("responseToMessageId").asText());
-        assertNotNull(responseNode.get("payload").get("errorMessage"));
-    }
-
-    @Test
     void getMessageIdFromJson() {
         String json = "{\"messageId\": \"test-id-123\", \"other\": \"value\"}";
 
@@ -403,6 +160,346 @@ class SmartMessageHandlerTest {
         String messageId = handler.getMessageIdFromJson(json);
 
         assertNull(messageId);
+    }
+
+    // ========== sendSdcDisplayQuestionnaireAsync tests ==========
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_withQuestionnaireResource() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Questionnaire questionnaire = new Questionnaire();
+        questionnaire.setId("test-questionnaire");
+        questionnaire.setStatus(Enumerations.PublicationStatus.ACTIVE);
+
+        Patient patient = new Patient();
+        patient.setId("patient-123");
+
+        Encounter encounter = new Encounter();
+        encounter.setId("encounter-456");
+
+        Practitioner author = new Practitioner();
+        author.setId("practitioner-789");
+
+        AtomicReference<SmartMessageResponse> receivedResponse = new AtomicReference<>();
+        handler.sendSdcDisplayQuestionnaireAsync(
+                questionnaire,
+                null,
+                patient,
+                encounter,
+                author,
+                receivedResponse::set
+        );
+
+        assertNotNull(sentMessage.get());
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+
+        assertEquals("sdc.displayQuestionnaire", messageNode.get("messageType").asText());
+        assertEquals("smart-web-messaging", messageNode.get("messagingHandle").asText());
+        assertNotNull(messageNode.get("messageId").asText());
+
+        JsonNode payload = messageNode.get("payload");
+        assertNotNull(payload.get("questionnaire"));
+        assertNotNull(payload.get("context"));
+        assertNotNull(payload.get("context").get("launchContext"));
+        assertTrue(payload.get("context").get("launchContext").isArray());
+        assertEquals(3, payload.get("context").get("launchContext").size());
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_withCanonicalUrl() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        String canonicalUrl = "http://example.org/Questionnaire/test";
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                canonicalUrl,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        assertNotNull(sentMessage.get());
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+
+        assertEquals("sdc.displayQuestionnaire", messageNode.get("messageType").asText());
+
+        JsonNode payload = messageNode.get("payload");
+        assertEquals(canonicalUrl, payload.get("questionnaire").asText());
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_withQuestionnaireResponse() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Questionnaire questionnaire = new Questionnaire();
+        questionnaire.setId("test-questionnaire");
+
+        QuestionnaireResponse qr = new QuestionnaireResponse();
+        qr.setId("qr-123");
+        qr.setStatus(QuestionnaireResponse.QuestionnaireResponseStatus.INPROGRESS);
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                questionnaire,
+                qr,
+                null,
+                null,
+                null,
+                null
+        );
+
+        assertNotNull(sentMessage.get());
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        JsonNode payload = messageNode.get("payload");
+
+        assertNotNull(payload.get("questionnaireResponse"));
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_withReferences() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Reference subject = new Reference("Patient/123");
+        Reference author = new Reference("Practitioner/456");
+        Reference encounter = new Reference("Encounter/789");
+
+        List<LaunchContext> launchContext = new ArrayList<>();
+        launchContext.add(new LaunchContext("custom", new Reference("Organization/org-1"), null));
+
+        Questionnaire questionnaire = new Questionnaire();
+        questionnaire.setId("test-questionnaire");
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                questionnaire,
+                null,
+                subject,
+                author,
+                encounter,
+                launchContext,
+                null
+        );
+
+        assertNotNull(sentMessage.get());
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        JsonNode context = messageNode.get("payload").get("context");
+
+        assertNotNull(context.get("subject"));
+        assertNotNull(context.get("author"));
+        assertNotNull(context.get("encounter"));
+        assertEquals(1, context.get("launchContext").size());
+        assertEquals("custom", context.get("launchContext").get(0).get("name").asText());
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_registersResponseListener() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        AtomicReference<SmartMessageResponse> receivedResponse = new AtomicReference<>();
+        handler.sendSdcDisplayQuestionnaireAsync(
+                "http://example.org/Questionnaire/test",
+                null,
+                null,
+                null,
+                null,
+                receivedResponse::set
+        );
+
+        // Extract messageId from the sent message
+        String messageId = objectMapper.readTree(sentMessage.get()).get("messageId").asText();
+
+        // Verify listener was registered
+        assertTrue(handler.hasPendingResponseListener(messageId));
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_responseListenerCanBeCleared() throws Exception {
+        AtomicReference<String> capturedMessageId = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            try {
+                capturedMessageId.set(objectMapper.readTree(msg).get("messageId").asText());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        AtomicReference<SmartMessageResponse> receivedResponse = new AtomicReference<>();
+        handler.sendSdcDisplayQuestionnaireAsync(
+                "http://example.org/Questionnaire/test",
+                null,
+                null,
+                null,
+                null,
+                receivedResponse::set
+        );
+
+        // Verify listener is registered
+        assertTrue(handler.hasPendingResponseListener(capturedMessageId.get()));
+
+        // Verify we can unregister the listener
+        handler.unregisterResponseListener(capturedMessageId.get());
+        assertFalse(handler.hasPendingResponseListener(capturedMessageId.get()));
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_clearAllListeners() throws Exception {
+        AtomicReference<String> capturedMessageId = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            try {
+                capturedMessageId.set(objectMapper.readTree(msg).get("messageId").asText());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                "http://example.org/Questionnaire/test",
+                null,
+                null,
+                null,
+                null,
+                response -> {}
+        );
+
+        assertTrue(handler.hasPendingResponseListener(capturedMessageId.get()));
+
+        handler.clearAllResponseListeners();
+
+        assertFalse(handler.hasPendingResponseListener(capturedMessageId.get()));
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_throwsWithoutMessageSender() {
+        Questionnaire questionnaire = new Questionnaire();
+        questionnaire.setId("test-questionnaire");
+
+        assertThrows(IllegalStateException.class, () -> {
+            handler.sendSdcDisplayQuestionnaireAsync(
+                    questionnaire,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+        });
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_withNullResponseHandler() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                "http://example.org/Questionnaire/test",
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        assertNotNull(sentMessage.get());
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        String messageId = messageNode.get("messageId").asText();
+
+        // No listener should be registered when responseHandler is null
+        assertFalse(handler.hasPendingResponseListener(messageId));
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_launchContextContainsPatientEncounterAuthor() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Patient patient = new Patient();
+        patient.setId("patient-123");
+        patient.addName().setFamily("Doe").addGiven("John");
+
+        Encounter encounter = new Encounter();
+        encounter.setId("encounter-456");
+
+        Practitioner author = new Practitioner();
+        author.setId("practitioner-789");
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                new Questionnaire(),
+                null,
+                patient,
+                encounter,
+                author,
+                null
+        );
+
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        JsonNode launchContext = messageNode.get("payload").get("context").get("launchContext");
+
+        // Verify launch context entries
+        List<String> names = new ArrayList<>();
+        for (JsonNode ctx : launchContext) {
+            names.add(ctx.get("name").asText());
+        }
+
+        assertTrue(names.contains("patient"));
+        assertTrue(names.contains("encounter"));
+        assertTrue(names.contains("user"));
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_partialContext() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Patient patient = new Patient();
+        patient.setId("patient-123");
+
+        // Only patient, no encounter or author
+        handler.sendSdcDisplayQuestionnaireAsync(
+                new Questionnaire(),
+                null,
+                patient,
+                null,
+                null,
+                null
+        );
+
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        JsonNode launchContext = messageNode.get("payload").get("context").get("launchContext");
+
+        assertEquals(1, launchContext.size());
+        assertEquals("patient", launchContext.get(0).get("name").asText());
     }
 
 }

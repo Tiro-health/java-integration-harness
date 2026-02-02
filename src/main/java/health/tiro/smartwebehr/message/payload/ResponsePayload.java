@@ -14,10 +14,6 @@ import java.util.Map;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.DEDUCTION, defaultImpl = ResponsePayload.class)
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = ScratchpadCreateResponse.class),
-    @JsonSubTypes.Type(value = ScratchpadUpdateResponse.class),
-    @JsonSubTypes.Type(value = ScratchpadDeleteResponse.class),
-    @JsonSubTypes.Type(value = ScratchpadReadResponse.class),
     @JsonSubTypes.Type(value = ErrorResponse.class)
 })
 public class ResponsePayload {
