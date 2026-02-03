@@ -18,7 +18,7 @@ Add to your `pom.xml`:
 <dependency>
     <groupId>health.tiro</groupId>
     <artifactId>smart-web-ehr</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
@@ -199,7 +199,7 @@ handler.sendSdcConfigureContextAsync(
 
 ## Dependencies
 
-- HAPI FHIR R5 (7.0.0)
+- HAPI FHIR R5 (5.7.0)
 - Jackson Databind (2.15.3)
 - SLF4J (2.0.9)
 - Javax Validation API (2.0.1.Final)
