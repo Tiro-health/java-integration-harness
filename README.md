@@ -12,13 +12,15 @@ A Java port of the [SMARTWebEHR](https://github.com/Tiro-health/SMARTWebEHR) .NE
 
 ## Installation
 
+Available on [Maven Central](https://repo1.maven.org/maven2/health/tiro/smart-web-ehr/).
+
 Add to your `pom.xml`:
 
 ```xml
 <dependency>
     <groupId>health.tiro</groupId>
     <artifactId>smart-web-ehr</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.7</version>
 </dependency>
 ```
 
