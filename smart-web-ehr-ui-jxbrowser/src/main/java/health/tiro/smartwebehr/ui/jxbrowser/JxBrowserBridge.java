@@ -13,7 +13,7 @@ import java.util.function.Function;
  * Exposes a {@code @JsAccessible} {@link #postMessage(String)} method
  * that JS calls via {@code window.javaBridge.postMessage(json)}.
  */
-class JxBrowserBridge {
+public class JxBrowserBridge {
 
     private static final Logger logger = LoggerFactory.getLogger(JxBrowserBridge.class);
 

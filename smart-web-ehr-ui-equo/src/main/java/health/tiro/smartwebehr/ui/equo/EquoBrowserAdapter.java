@@ -25,8 +25,7 @@ import java.util.function.Function;
  * {@link EmbeddedBrowser} implementation backed by Equo Chromium.
  *
  * <p>Uses URL scheme interception ({@code swm://postMessage/}) for JS→Java messaging.
- * The user's HTML page must include {@code <script>window.__equoHost = true;</script>}
- * before the SMART Web Messaging bridge script so the bridge JS detects the Equo transport.
+ * Automatically injects {@code window.__equoHost = true} so the bridge JS detects the Equo transport.
  *
  * <pre>{@code
  * EmbeddedBrowser browser = new EquoBrowserAdapter();
@@ -64,6 +63,8 @@ public class EquoBrowserAdapter implements EmbeddedBrowser {
             // First load: create the browser with the target URL
             browser = ChromiumBrowser.swing(container, BorderLayout.CENTER, resolvedUrl);
             setupUrlInterception();
+            // Inject host flag so the JS bridge detects the Equo transport
+            browser.executeJavaScript("window.__equoHost = true");
             logger.info("Equo Chromium browser created, loading: {}", resolvedUrl);
         } else {
             // Subsequent navigations

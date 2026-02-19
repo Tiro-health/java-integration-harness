@@ -1,6 +1,7 @@
 package health.tiro.smartwebehr.ui.jxbrowser;
 
 import com.teamdev.jxbrowser.browser.Browser;
+import com.teamdev.jxbrowser.browser.event.ConsoleMessageReceived;
 import com.teamdev.jxbrowser.engine.Engine;
 import com.teamdev.jxbrowser.engine.EngineOptions;
 import com.teamdev.jxbrowser.navigation.event.FrameLoadFinished;
@@ -57,6 +58,13 @@ public class JxBrowserAdapter implements EmbeddedBrowser {
         });
 
         browser = engine.newBrowser();
+
+        browser.on(ConsoleMessageReceived.class, event ->
+            logger.info("[JS Console] {}: {}",
+                event.consoleMessage().level(),
+                event.consoleMessage().message())
+        );
+
         bridge = new JxBrowserBridge(browser);
 
         if (pendingIncomingMessageHandler != null) {
