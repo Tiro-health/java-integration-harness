@@ -8,15 +8,8 @@ import org.slf4j.LoggerFactory;
 import javax.swing.JPanel;
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
@@ -40,7 +33,6 @@ public class EquoBrowserAdapter implements EmbeddedBrowser {
     private ChromiumBrowser browser;
     private JPanel container;
     private Function<String, String> incomingMessageHandler;
-    private Path tempFile;
 
     public EquoBrowserAdapter() {
     }
@@ -56,16 +48,14 @@ public class EquoBrowserAdapter implements EmbeddedBrowser {
 
     @Override
     public void loadUrl(String url) {
-        String resolvedUrl = resolveUrl(url);
-
         if (browser == null) {
-            browser = ChromiumBrowser.swing(container, BorderLayout.CENTER, resolvedUrl);
+            browser = ChromiumBrowser.swing(container, BorderLayout.CENTER, url);
             setupUrlInterception();
             setupPageLoadListener();
             setupConsoleListener();
-            logger.info("Equo Chromium browser created, loading: {}", resolvedUrl);
+            logger.info("Equo Chromium browser created, loading: {}", url);
         } else {
-            browser.setUrl(resolvedUrl);
+            browser.setUrl(url);
         }
     }
 
@@ -93,12 +83,8 @@ public class EquoBrowserAdapter implements EmbeddedBrowser {
 
     @Override
     public void dispose() {
-        if (tempFile != null) {
-            try {
-                Files.deleteIfExists(tempFile);
-            } catch (IOException e) {
-                logger.warn("Failed to delete temp file: {}", tempFile, e);
-            }
+        if (browser != null) {
+            browser.close();
         }
     }
 
@@ -177,33 +163,4 @@ public class EquoBrowserAdapter implements EmbeddedBrowser {
         browser.executeJavaScript("window.swmReceiveMessage('" + escaped + "');");
     }
 
-    /**
-     * Resolve a URL for loading in CEF.
-     * CEF cannot load jar: URLs, so classpath resources are extracted to temp files.
-     */
-    private String resolveUrl(String url) {
-        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) {
-            return url;
-        }
-
-        URL resource = getClass().getResource(url);
-        if (resource == null) {
-            return url;
-        }
-
-        if ("jar".equals(resource.getProtocol())) {
-            try {
-                tempFile = Files.createTempFile("smart-web-ehr-", ".html");
-                tempFile.toFile().deleteOnExit();
-                try (InputStream in = getClass().getResourceAsStream(url)) {
-                    Files.copy(in, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                }
-                return tempFile.toUri().toString();
-            } catch (IOException e) {
-                throw new UncheckedIOException("Failed to extract resource: " + url, e);
-            }
-        }
-
-        return resource.toExternalForm();
-    }
 }
