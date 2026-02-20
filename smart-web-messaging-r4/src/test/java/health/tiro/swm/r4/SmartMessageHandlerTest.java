@@ -27,7 +27,7 @@ class SmartMessageHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new SmartMessageHandler();
-        objectMapper = handler.getObjectMapper();
+        objectMapper = new ObjectMapper();
     }
 
     @Test

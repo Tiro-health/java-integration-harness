@@ -38,7 +38,7 @@ public class FormViewer {
     private final EmbeddedBrowser browser;
     private final AbstractSmartMessageHandler handler;
     private final Component component;
-    private final CompletableFuture<Void> handshakeReceived = new CompletableFuture<>();
+    private volatile CompletableFuture<Void> handshakeReceived = new CompletableFuture<>();
     private final ScheduledExecutorService timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "swm-handshake-timeout");
         t.setDaemon(true);
@@ -62,10 +62,12 @@ public class FormViewer {
         browser.setIncomingMessageHandler(json -> handler.handleMessage(json));
 
         // Wire outgoing messages: handler → JS (queued until handshake completes)
-        handler.setMessageSender(json -> {
-            handshakeReceived.thenRun(() -> browser.sendMessage(json));
-            return handshakeReceived.thenApply(v -> null);
-        });
+        handler.setMessageSender(json ->
+            handshakeReceived.thenApply(v -> {
+                browser.sendMessage(json);
+                return null;
+            })
+        );
 
         // Listen for SMART Web Messaging events
         handler.addListener(new SmartMessageListener() {
@@ -163,8 +165,11 @@ public class FormViewer {
 
     /**
      * Navigate the browser to a different URL.
+     * Resets the handshake state so outbound messages are queued until the new page completes its handshake.
      */
     public void navigate(String url) {
+        handshakeReceived = new CompletableFuture<>();
+        handler.clearAllResponseListeners();
         browser.loadUrl(url);
     }
 
@@ -188,7 +193,9 @@ public class FormViewer {
      */
     public void dispose() {
         timeoutScheduler.shutdownNow();
-        browser.dispose();
+        // Run on a separate thread to avoid deadlocks when called from within
+        // a browser callback (e.g., from an onFormSubmitted listener).
+        new Thread(() -> browser.dispose(), "formviewer-dispose").start();
     }
 
     /**

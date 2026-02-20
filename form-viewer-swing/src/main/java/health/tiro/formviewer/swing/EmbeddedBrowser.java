@@ -55,7 +55,10 @@ public interface EmbeddedBrowser {
         String escaped = json.replace("\\", "\\\\")
                              .replace("'", "\\'")
                              .replace("\n", "\\n")
-                             .replace("\r", "\\r");
+                             .replace("\r", "\\r")
+                             .replace("\u2028", "\\u2028")
+                             .replace("\u2029", "\\u2029")
+                             .replace("\u0000", "\\u0000");
         executeJavaScript("window.swmReceiveMessage('" + escaped + "');");
     }
 

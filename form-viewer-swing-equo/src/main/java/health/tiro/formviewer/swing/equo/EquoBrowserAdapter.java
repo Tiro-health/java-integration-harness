@@ -54,7 +54,7 @@ public class EquoBrowserAdapter implements EmbeddedBrowser {
     }
 
     @Override
-    public void loadUrl(String url) {
+    public synchronized void loadUrl(String url) {
         if (browser == null) {
             browser = ChromiumBrowser.swing(container, BorderLayout.CENTER, url);
             setupUrlInterception();
@@ -123,7 +123,11 @@ public class EquoBrowserAdapter implements EmbeddedBrowser {
                 "}"
             );
             for (Runnable listener : pageLoadListeners) {
-                listener.run();
+                try {
+                    listener.run();
+                } catch (Exception e) {
+                    logger.error("Error in page load listener", e);
+                }
             }
         });
     }

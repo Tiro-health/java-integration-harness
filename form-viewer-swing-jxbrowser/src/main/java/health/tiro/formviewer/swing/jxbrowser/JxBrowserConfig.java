@@ -44,7 +44,7 @@ public class JxBrowserConfig {
 
     public static class Builder {
         private String licenseKey;
-        private Language language = Language.DUTCH;
+        private Language language = Language.ENGLISH_US;
         private RenderingMode renderingMode = RenderingMode.HARDWARE_ACCELERATED;
 
         private Builder() {}

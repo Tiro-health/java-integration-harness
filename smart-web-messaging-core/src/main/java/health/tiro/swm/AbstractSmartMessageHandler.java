@@ -144,9 +144,15 @@ public abstract class AbstractSmartMessageHandler {
 
         try {
             String messageType = message.getMessageType();
+            if (messageType == null) {
+                return serializeResponse(SmartMessageResponse.createErrorResponse(
+                    message.getMessageId(),
+                    new ErrorResponse("messageType is required", "MissingFieldException")
+                ));
+            }
             JsonNode payload = message.getPayload();
 
-            switch (messageType) {
+            switch (message.getMessageType().toLowerCase(java.util.Locale.ROOT)) {
 
                 case "status.handshake":
                     logger.debug("Handling status.handshake request.");
@@ -177,7 +183,7 @@ public abstract class AbstractSmartMessageHandler {
         }
 
         String responseJson = serializeResponse(response);
-        logger.info("Created response={}", responseJson);
+        logger.debug("Created response={}", responseJson);
         return responseJson;
     }
 
@@ -295,7 +301,8 @@ public abstract class AbstractSmartMessageHandler {
     public CompletableFuture<String> sendMessageAsync(String messageType, RequestPayload payload, Consumer<SmartMessageResponse> responseHandler) {
         logger.info("Sending message async: MessageType={}", messageType);
 
-        if (messageSender == null) {
+        MessageSender sender = this.messageSender;
+        if (sender == null) {
             throw new IllegalStateException("MessageSender must be set before sending messages");
         }
 
@@ -309,8 +316,9 @@ public abstract class AbstractSmartMessageHandler {
         try {
             String requestJson = serializeRequest(messageId, messageType, payload);
             logger.debug("Sending JSON message: {}", requestJson);
-            return messageSender.sendMessage(requestJson);
+            return sender.sendMessage(requestJson);
         } catch (JsonProcessingException e) {
+            responseListeners.remove(messageId);
             logger.error("Failed to serialize request", e);
             CompletableFuture<String> future = new CompletableFuture<>();
             future.completeExceptionally(e);
@@ -506,7 +514,7 @@ public abstract class AbstractSmartMessageHandler {
 
     // ========== Getters ==========
 
-    public ObjectMapper getObjectMapper() {
+    protected ObjectMapper getObjectMapper() {
         return objectMapper;
     }
 }

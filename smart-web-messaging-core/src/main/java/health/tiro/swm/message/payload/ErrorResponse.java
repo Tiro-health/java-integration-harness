@@ -23,8 +23,8 @@ public class ErrorResponse extends ResponsePayload {
     }
 
     public ErrorResponse(Exception error) {
-        this.errorMessage = error.getMessage();
-        this.errorType = error.getClass().getSimpleName();
+        this.errorMessage = "An internal error occurred";
+        this.errorType = "InternalError";
     }
 
     public String getErrorMessage() {
