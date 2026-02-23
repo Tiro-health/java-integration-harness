@@ -53,6 +53,7 @@
         <hapi.fhir.version>5.7.0</hapi.fhir.version>
         <jackson.version>2.15.3</jackson.version>
         <slf4j.version>2.0.9</slf4j.version>
+        <sentry.version>8.33.0</sentry.version>
     </properties>
 
     <dependencyManagement>
@@ -120,6 +121,13 @@
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-simple</artifactId>
                 <version>${slf4j.version}</version>
+            </dependency>
+
+            <!-- Sentry -->
+            <dependency>
+                <groupId>io.sentry</groupId>
+                <artifactId>sentry</artifactId>
+                <version>${sentry.version}</version>
             </dependency>
 
             <!-- Validation -->

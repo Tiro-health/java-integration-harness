@@ -241,6 +241,40 @@ cd examples/equo
 mvn compile exec:exec
 ```
 
+## Sentry Integration (Optional)
+
+The `form-filler-swing` module has built-in support for [Sentry](https://sentry.io) tracing. When Sentry is on the classpath and initialized, the library automatically creates a transaction per `FormFiller` session with spans for:
+
+- JS bridge injection
+- Every SMART Web Messaging message sent and received (with full JSON payload)
+- Handshake completion
+- Form submission
+
+Spans are created on a shared transaction instance, so they work across all threads (Swing EDT, browser render thread, message handler thread).
+
+### Setup
+
+**1. Add the Sentry dependency to your application:**
+
+```xml
+<dependency>
+    <groupId>io.sentry</groupId>
+    <artifactId>sentry</artifactId>
+    <version>8.33.0</version>
+</dependency>
+```
+
+**2. Initialize Sentry before creating the `FormFiller`:**
+
+```java
+Sentry.init(options -> {
+    options.setDsn("https://your-key@o0.ingest.sentry.io/0");
+    options.setTracesSampleRate(1.0);
+});
+```
+
+**3. That's it.** The library detects Sentry automatically. If Sentry is not on the classpath, tracing is a no-op with zero overhead.
+
 ## Requirements
 
 - Java 8 or higher
