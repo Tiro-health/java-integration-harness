@@ -1,6 +1,6 @@
-# SMART Web EHR - Java
+# Java Integration Harness
 
-A Java port of the [SMARTWebEHR](https://github.com/Tiro-health/SMARTWebEHR) .NET library for handling SMART Web Messaging protocol in embedded browsers.
+Embed the [Tiro.health form filler](https://tiro.health) in Java desktop applications using SMART Web Messaging.
 
 ## Features
 
@@ -247,4 +247,4 @@ mvn compile exec:exec
 
 ## License
 
-MIT License - same as the original .NET library.
+Apache License 2.0
