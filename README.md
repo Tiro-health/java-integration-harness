@@ -220,6 +220,15 @@ See the [`examples/`](examples/) directory for runnable demo applications:
 
 **Running the examples:**
 
+First, serve the form filler page on `http://localhost:8000`:
+
+```bash
+cd examples/src/main/resources/form-filler
+python3 -m http.server 8000
+```
+
+Then in a separate terminal:
+
 ```bash
 # JxBrowser (requires a license key)
 cd examples/jxbrowser
