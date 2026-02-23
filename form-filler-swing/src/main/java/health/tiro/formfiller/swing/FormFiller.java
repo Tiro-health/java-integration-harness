@@ -1,5 +1,7 @@
 package health.tiro.formfiller.swing;
 
+import health.tiro.formfiller.swing.tracing.FormFillerTracer;
+import health.tiro.formfiller.swing.tracing.FormFillerTracerFactory;
 import health.tiro.swm.AbstractSmartMessageHandler;
 import health.tiro.swm.events.*;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -10,6 +12,8 @@ import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Controller that wires an embedded browser to a SMART Web Messaging handler.
@@ -34,8 +38,11 @@ import java.util.concurrent.*;
 public class FormFiller {
 
     private static final Logger logger = LoggerFactory.getLogger(FormFiller.class);
+    private static final Pattern MESSAGE_TYPE_PATTERN = Pattern.compile(
+        "\"messageType\"\\s*:\\s*\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
 
     private final FormFillerConfig config;
+    private final FormFillerTracer tracer;
     private final EmbeddedBrowser browser;
     private final AbstractSmartMessageHandler handler;
     private final Component component;
@@ -58,23 +65,34 @@ public class FormFiller {
         this.config = config;
         this.browser = browser;
         this.handler = handler;
+        this.tracer = FormFillerTracerFactory.create();
+
+        tracer.startSession(config.getTargetUrl(), browser.getClass().getSimpleName());
 
         // Wire incoming messages: JS → handler → response sent by adapter via return value
-        browser.setIncomingMessageHandler(handler::handleMessage);
+        browser.setIncomingMessageHandler(json -> {
+            tracer.traceMessageReceived(extractMessageType(json), handler.getMessageIdFromJson(json), json);
+            return handler.handleMessage(json);
+        });
 
         // Wire outgoing messages: handler → JS (queued until handshake completes)
-        handler.setMessageSender(json ->
-            handshakeReceived.thenApply(v -> {
+        handler.setMessageSender(json -> {
+            tracer.traceMessageSent(extractMessageType(json), handler.getMessageIdFromJson(json), json);
+            return handshakeReceived.thenApply(v -> {
                 browser.sendMessage(json);
                 return null;
-            })
-        );
+            });
+        });
+
+        // Track bridge injection on page load
+        browser.addPageLoadListener(() -> tracer.traceBridgeInjected());
 
         // Listen for SMART Web Messaging events
         handler.addListener(new SmartMessageListener() {
             @Override
             public void onHandshakeReceived(HandshakeReceivedEvent event) {
                 logger.info("Handshake received from web page");
+                tracer.traceHandshakeReceived();
                 handshakeReceived.complete(null);
                 fireHandshakeReceived();
             }
@@ -82,6 +100,7 @@ public class FormFiller {
             @Override
             public void onFormSubmitted(FormSubmittedEvent event) {
                 logger.info("Form submitted");
+                tracer.traceFormSubmitted();
                 fireFormSubmitted(event.getResponse(), event.getOutcome());
             }
 
@@ -199,10 +218,18 @@ public class FormFiller {
      * Clean up resources. Call this when the viewer is no longer needed.
      */
     public void dispose() {
+        tracer.finishSession();
         timeoutScheduler.shutdownNow();
         // Run on a separate thread to avoid deadlocks when called from within
         // a browser callback (e.g., from an onFormSubmitted listener).
         new Thread(browser::dispose, "formfiller-dispose").start();
+    }
+
+    private static String extractMessageType(String json) {
+        Matcher m = MESSAGE_TYPE_PATTERN.matcher(json);
+        if (m.find()) return m.group(1);
+        if (json.contains("\"responseToMessageId\"")) return "response";
+        return "unknown";
     }
 
     /**
