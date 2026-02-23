@@ -41,5 +41,29 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>health.tiro</groupId>
+            <artifactId>smart-web-messaging-r4</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.teamdev.jxbrowser</groupId>
+            <artifactId>jxbrowser-cross-platform</artifactId>
+            <version>${jxbrowser.version}</version>
+            <type>pom</type>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

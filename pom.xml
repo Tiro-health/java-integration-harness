@@ -42,8 +42,6 @@
         <module>form-filler-swing</module>
         <module>form-filler-swing-jxbrowser</module>
         <module>form-filler-swing-equo</module>
-        <module>examples/jxbrowser</module>
-        <module>examples/equo</module>
     </modules>
 
     <properties>
@@ -223,6 +221,13 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>examples</id>
+            <modules>
+                <module>examples/jxbrowser</module>
+                <module>examples/equo</module>
+            </modules>
+        </profile>
         <profile>
             <id>release</id>
             <build>
