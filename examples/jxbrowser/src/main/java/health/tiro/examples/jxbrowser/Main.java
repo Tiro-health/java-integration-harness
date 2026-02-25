@@ -95,7 +95,7 @@ public class Main {
 
             handler.sendSdcDisplayQuestionnaireAsync(
                     "http://templates.tiro.health/templates/2630b8675c214707b1f86d1fbd4deb87",
-                    null, patient, null, null, null
+                    null, patient, null, (Practitioner) null, null
             ).exceptionally(e -> {
                 System.err.println("Failed to display questionnaire: " + e.getMessage());
                 return null;
