@@ -220,11 +220,11 @@ See the [`examples/`](examples/) directory for runnable demo applications:
 
 **Running the examples:**
 
-First, serve the form filler page on `http://localhost:8000`:
+First, serve the form filler page on `http://127.0.0.1:8001`:
 
 ```bash
 cd examples/src/main/resources/form-filler
-python3 -m http.server 8000
+python3 -m http.server 8001 --bind 127.0.0.1
 ```
 
 Then in a separate terminal:
