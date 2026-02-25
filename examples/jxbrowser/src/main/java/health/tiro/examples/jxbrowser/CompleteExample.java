@@ -27,6 +27,7 @@ public class CompleteExample {
 
     private static final Map<String, QuestionnaireResponse> savedResponses = new HashMap<>();
     private static String currentTemplateUrl = null;
+    private static PractitionerRole selectedRole = null;
 
     public static void main(String[] args) {
         try {
@@ -47,8 +48,9 @@ public class CompleteExample {
 
             // 2. Set up clinical context
             Patient patient = createPatient();
-            Practitioner practitioner = createPractitioner();
-            Encounter encounter = createEncounter(patient, practitioner);
+            PractitionerRole[] roles = createPractitionerRoles();
+            selectedRole = roles[0];
+            Encounter encounter = createEncounter(patient);
 
             // 3. Build the UI
             JFrame frame = new JFrame("EHR Workspace — Tiro.health Demo");
@@ -56,13 +58,14 @@ public class CompleteExample {
             frame.setSize(1400, 900);
             frame.setLayout(new BorderLayout());
 
-            frame.add(createHeaderBar(practitioner), BorderLayout.NORTH);
+            JPanel headerBar = createHeaderBar(selectedRole);
+            frame.add(headerBar, BorderLayout.NORTH);
 
             JScrollPane leftScroll = new JScrollPane(createPatientContextPanel(patient, encounter));
             leftScroll.setBorder(null);
             leftScroll.setPreferredSize(new Dimension(400, 0));
 
-            JPanel rightPanel = createReportingPanel(filler, handler, patient, encounter, practitioner);
+            JPanel rightPanel = createReportingPanel(filler, handler, patient, encounter, roles, headerBar);
 
             JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftScroll, rightPanel);
             splitPane.setDividerLocation(420);
@@ -119,16 +122,16 @@ public class CompleteExample {
             frame.setVisible(true);
 
             // 6. Load the first template automatically
-            loadTemplate(handler, 0, patient, encounter, practitioner);
+            loadTemplate(handler, 0, patient, encounter);
         });
     }
 
     private static void loadTemplate(SmartMessageHandler handler, int index,
-                                     Patient patient, Encounter encounter, Practitioner practitioner) {
+                                     Patient patient, Encounter encounter) {
         currentTemplateUrl = TEMPLATES[index][1];
         QuestionnaireResponse saved = savedResponses.get(currentTemplateUrl);
         handler.sendSdcDisplayQuestionnaireAsync(
-                currentTemplateUrl, saved, patient, encounter, practitioner, null
+                currentTemplateUrl, saved, patient, encounter, selectedRole, null
         ).exceptionally(e -> {
             System.err.println("Failed to display questionnaire: " + e.getMessage());
             return null;
@@ -152,20 +155,37 @@ public class CompleteExample {
         return patient;
     }
 
-    private static Practitioner createPractitioner() {
-        Practitioner practitioner = new Practitioner();
-        practitioner.setId("practitioner-001");
-        practitioner.addName(new HumanName()
-                .setFamily("Van Damme")
-                .addPrefix("dr.")
-                .setText("dr. Van Damme"));
-        practitioner.addIdentifier(new Identifier()
-                .setSystem("http://example.org/practitioner-ids")
-                .setValue("practitioner-001"));
-        return practitioner;
+    private static PractitionerRole[] createPractitionerRoles() {
+        PractitionerRole surgeon = new PractitionerRole();
+        surgeon.setId("role-001");
+        surgeon.setPractitioner(new Reference("Practitioner/practitioner-001")
+                .setDisplay("dr. Van Damme"));
+        surgeon.addCode(new CodeableConcept().addCoding(new Coding()
+                .setSystem("http://snomed.info/sct")
+                .setCode("304292004")
+                .setDisplay("Surgeon")));
+        surgeon.addSpecialty(new CodeableConcept().addCoding(new Coding()
+                .setSystem("http://snomed.info/sct")
+                .setCode("394609007")
+                .setDisplay("General surgery")));
+
+        PractitionerRole anesthesiologist = new PractitionerRole();
+        anesthesiologist.setId("role-002");
+        anesthesiologist.setPractitioner(new Reference("Practitioner/practitioner-002")
+                .setDisplay("dr. Janssen"));
+        anesthesiologist.addCode(new CodeableConcept().addCoding(new Coding()
+                .setSystem("http://snomed.info/sct")
+                .setCode("88189002")
+                .setDisplay("Anesthesiologist")));
+        anesthesiologist.addSpecialty(new CodeableConcept().addCoding(new Coding()
+                .setSystem("http://snomed.info/sct")
+                .setCode("394577000")
+                .setDisplay("Anesthetics")));
+
+        return new PractitionerRole[]{surgeon, anesthesiologist};
     }
 
-    private static Encounter createEncounter(Patient patient, Practitioner practitioner) {
+    private static Encounter createEncounter(Patient patient) {
         Encounter encounter = new Encounter();
         encounter.setId("ENC-2026-00214");
         encounter.setStatus(Encounter.EncounterStatus.INPROGRESS);
@@ -179,9 +199,6 @@ public class CompleteExample {
                 .setDisplay("Robotic assisted laparoscopic prostatectomy")));
         encounter.setSubject(new Reference("Patient/" + patient.getId())
                 .setDisplay(patient.getNameFirstRep().getText()));
-        encounter.addParticipant().setIndividual(
-                new Reference("Practitioner/" + practitioner.getId())
-                        .setDisplay(practitioner.getNameFirstRep().getText()));
         encounter.setPriority(new CodeableConcept().addCoding(new Coding()
                 .setSystem("http://terminology.hl7.org/CodeSystem/v3-ActPriority")
                 .setCode("EL")
@@ -192,7 +209,9 @@ public class CompleteExample {
 
     // --- UI components ---
 
-    private static JPanel createHeaderBar(Practitioner practitioner) {
+    private static final String LOGGED_IN_LABEL_NAME = "loggedInLabel";
+
+    private static JPanel createHeaderBar(PractitionerRole role) {
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(Color.WHITE);
         header.setBorder(BorderFactory.createCompoundBorder(
@@ -210,13 +229,29 @@ public class CompleteExample {
         left.add(title);
         left.add(subtitle);
 
-        JLabel practitionerLabel = new JLabel("LOGGED IN  " + practitioner.getNameFirstRep().getText());
+        JLabel practitionerLabel = new JLabel(loggedInText(role));
+        practitionerLabel.setName(LOGGED_IN_LABEL_NAME);
         practitionerLabel.setFont(practitionerLabel.getFont().deriveFont(Font.PLAIN, 13f));
         practitionerLabel.setForeground(new Color(0x555555));
 
         header.add(left, BorderLayout.WEST);
         header.add(practitionerLabel, BorderLayout.EAST);
         return header;
+    }
+
+    private static String loggedInText(PractitionerRole role) {
+        String name = role.getPractitioner().getDisplay();
+        String roleDisplay = role.getCodeFirstRep().getCodingFirstRep().getDisplay();
+        return "LOGGED IN  " + name + " (" + roleDisplay + ")";
+    }
+
+    private static void updateHeaderBar(JPanel headerBar, PractitionerRole role) {
+        for (Component c : headerBar.getComponents()) {
+            if (c instanceof JLabel && LOGGED_IN_LABEL_NAME.equals(c.getName())) {
+                ((JLabel) c).setText(loggedInText(role));
+                break;
+            }
+        }
     }
 
     private static JPanel createPatientContextPanel(Patient patient, Encounter encounter) {
@@ -257,11 +292,12 @@ public class CompleteExample {
     }
 
     private static JPanel createReportingPanel(FormFiller filler, SmartMessageHandler handler,
-                                                  Patient patient, Encounter encounter, Practitioner practitioner) {
+                                                  Patient patient, Encounter encounter,
+                                                  PractitionerRole[] roles, JPanel headerBar) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(new Color(0xF5F5F5));
 
-        // Top bar with template selector
+        // Top bar with practitioner and template selectors
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(Color.WHITE);
         topBar.setBorder(BorderFactory.createCompoundBorder(
@@ -274,6 +310,23 @@ public class CompleteExample {
 
         JPanel selector = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         selector.setOpaque(false);
+
+        // Practitioner selector
+        JLabel practitionerLabel = new JLabel("PRACTITIONER");
+        practitionerLabel.setFont(practitionerLabel.getFont().deriveFont(Font.PLAIN, 11f));
+        practitionerLabel.setForeground(Color.GRAY);
+
+        String[] practitionerNames = new String[roles.length];
+        for (int i = 0; i < roles.length; i++)
+            practitionerNames[i] = roles[i].getPractitioner().getDisplay();
+        JComboBox<String> practitionerCombo = new JComboBox<>(practitionerNames);
+        practitionerCombo.addActionListener(e -> {
+            selectedRole = roles[practitionerCombo.getSelectedIndex()];
+            updateHeaderBar(headerBar, selectedRole);
+            handler.sendSdcConfigureContextAsync(patient, encounter, selectedRole, null);
+        });
+
+        // Template selector
         JLabel templateLabel = new JLabel("TEMPLATE");
         templateLabel.setFont(templateLabel.getFont().deriveFont(Font.PLAIN, 11f));
         templateLabel.setForeground(Color.GRAY);
@@ -282,9 +335,12 @@ public class CompleteExample {
         for (int i = 0; i < TEMPLATES.length; i++) templateNames[i] = TEMPLATES[i][0];
         JComboBox<String> templateCombo = new JComboBox<>(templateNames);
         templateCombo.addActionListener(e ->
-                loadTemplate(handler, templateCombo.getSelectedIndex(), patient, encounter, practitioner)
+                loadTemplate(handler, templateCombo.getSelectedIndex(), patient, encounter)
         );
 
+        selector.add(practitionerLabel);
+        selector.add(practitionerCombo);
+        selector.add(Box.createHorizontalStrut(12));
         selector.add(templateLabel);
         selector.add(templateCombo);
         topBar.add(title, BorderLayout.WEST);

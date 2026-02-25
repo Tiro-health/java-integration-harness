@@ -7,6 +7,7 @@ import health.tiro.swm.AbstractSmartMessageHandler;
 import health.tiro.swm.message.SmartMessageResponse;
 import health.tiro.swm.message.payload.LaunchContext;
 import org.hl7.fhir.instance.model.api.IBaseReference;
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.*;
 
 import java.util.ArrayList;
@@ -59,23 +60,25 @@ public class SmartMessageHandler extends AbstractSmartMessageHandler {
     public CompletableFuture<String> sendSdcConfigureContextAsync(
             Patient patient,
             Encounter encounter,
-            Practitioner author,
+            Practitioner user,
             Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcConfigureContextAsync(patient, encounter, user, responseHandler);
+    }
 
-        logger.debug("Sending sdc.configureContext message with FHIR resources.");
+    public CompletableFuture<String> sendSdcConfigureContextAsync(
+            Patient patient,
+            Encounter encounter,
+            PractitionerRole user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcConfigureContextAsync(patient, encounter, user, responseHandler);
+    }
 
-        List<LaunchContext> launchContext = new ArrayList<>();
-        if (patient != null) {
-            launchContext.add(new LaunchContext("patient", null, patient));
-        }
-        if (encounter != null) {
-            launchContext.add(new LaunchContext("encounter", null, encounter));
-        }
-        if (author != null) {
-            launchContext.add(new LaunchContext("user", null, author));
-        }
-
-        return sendSdcConfigureContextAsync(null, null, null, launchContext, responseHandler);
+    public CompletableFuture<String> sendSdcConfigureContextAsync(
+            Patient patient,
+            Encounter encounter,
+            Patient user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcConfigureContextAsync(patient, encounter, user, responseHandler);
     }
 
     public CompletableFuture<String> sendSdcDisplayQuestionnaireAsync(
@@ -83,23 +86,29 @@ public class SmartMessageHandler extends AbstractSmartMessageHandler {
             QuestionnaireResponse questionnaireResponse,
             Patient patient,
             Encounter encounter,
-            Practitioner author,
+            Practitioner user,
             Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcDisplayQuestionnaireAsync(questionnaire, questionnaireResponse, patient, encounter, user, responseHandler);
+    }
 
-        logger.debug("Sending sdc.displayQuestionnaire message with FHIR resources.");
+    public CompletableFuture<String> sendSdcDisplayQuestionnaireAsync(
+            Questionnaire questionnaire,
+            QuestionnaireResponse questionnaireResponse,
+            Patient patient,
+            Encounter encounter,
+            PractitionerRole user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcDisplayQuestionnaireAsync(questionnaire, questionnaireResponse, patient, encounter, user, responseHandler);
+    }
 
-        List<LaunchContext> launchContext = new ArrayList<>();
-        if (patient != null) {
-            launchContext.add(new LaunchContext("patient", null, patient));
-        }
-        if (encounter != null) {
-            launchContext.add(new LaunchContext("encounter", null, encounter));
-        }
-        if (author != null) {
-            launchContext.add(new LaunchContext("user", null, author));
-        }
-
-        return sendSdcDisplayQuestionnaireAsync(questionnaire, questionnaireResponse, null, null, null, launchContext, responseHandler);
+    public CompletableFuture<String> sendSdcDisplayQuestionnaireAsync(
+            Questionnaire questionnaire,
+            QuestionnaireResponse questionnaireResponse,
+            Patient patient,
+            Encounter encounter,
+            Patient user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcDisplayQuestionnaireAsync(questionnaire, questionnaireResponse, patient, encounter, user, responseHandler);
     }
 
     public CompletableFuture<String> sendSdcDisplayQuestionnaireAsync(
@@ -107,11 +116,34 @@ public class SmartMessageHandler extends AbstractSmartMessageHandler {
             QuestionnaireResponse questionnaireResponse,
             Patient patient,
             Encounter encounter,
-            Practitioner author,
+            Practitioner user,
             Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcDisplayQuestionnaireAsync(questionnaireCanonicalUrl, questionnaireResponse, patient, encounter, user, responseHandler);
+    }
 
-        logger.debug("Sending sdc.displayQuestionnaire message with canonical URL.");
+    public CompletableFuture<String> sendSdcDisplayQuestionnaireAsync(
+            String questionnaireCanonicalUrl,
+            QuestionnaireResponse questionnaireResponse,
+            Patient patient,
+            Encounter encounter,
+            PractitionerRole user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcDisplayQuestionnaireAsync(questionnaireCanonicalUrl, questionnaireResponse, patient, encounter, user, responseHandler);
+    }
 
+    public CompletableFuture<String> sendSdcDisplayQuestionnaireAsync(
+            String questionnaireCanonicalUrl,
+            QuestionnaireResponse questionnaireResponse,
+            Patient patient,
+            Encounter encounter,
+            Patient user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        return doSendSdcDisplayQuestionnaireAsync(questionnaireCanonicalUrl, questionnaireResponse, patient, encounter, user, responseHandler);
+    }
+
+    // ========== Private implementation methods ==========
+
+    private List<LaunchContext> buildLaunchContext(Patient patient, Encounter encounter, IBaseResource user) {
         List<LaunchContext> launchContext = new ArrayList<>();
         if (patient != null) {
             launchContext.add(new LaunchContext("patient", null, patient));
@@ -119,11 +151,41 @@ public class SmartMessageHandler extends AbstractSmartMessageHandler {
         if (encounter != null) {
             launchContext.add(new LaunchContext("encounter", null, encounter));
         }
-        if (author != null) {
-            launchContext.add(new LaunchContext("user", null, author));
+        if (user != null) {
+            launchContext.add(new LaunchContext("user", null, user));
         }
+        return launchContext;
+    }
 
-        return sendSdcDisplayQuestionnaireAsync(questionnaireCanonicalUrl, questionnaireResponse, null, null, null, launchContext, responseHandler);
+    private CompletableFuture<String> doSendSdcConfigureContextAsync(
+            Patient patient,
+            Encounter encounter,
+            IBaseResource user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        logger.debug("Sending sdc.configureContext message with FHIR resources.");
+        return sendSdcConfigureContextAsync(null, null, null, buildLaunchContext(patient, encounter, user), responseHandler);
+    }
+
+    private CompletableFuture<String> doSendSdcDisplayQuestionnaireAsync(
+            Questionnaire questionnaire,
+            QuestionnaireResponse questionnaireResponse,
+            Patient patient,
+            Encounter encounter,
+            IBaseResource user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        logger.debug("Sending sdc.displayQuestionnaire message with FHIR resources.");
+        return sendSdcDisplayQuestionnaireAsync(questionnaire, questionnaireResponse, null, null, null, buildLaunchContext(patient, encounter, user), responseHandler);
+    }
+
+    private CompletableFuture<String> doSendSdcDisplayQuestionnaireAsync(
+            String questionnaireCanonicalUrl,
+            QuestionnaireResponse questionnaireResponse,
+            Patient patient,
+            Encounter encounter,
+            IBaseResource user,
+            Consumer<SmartMessageResponse> responseHandler) {
+        logger.debug("Sending sdc.displayQuestionnaire message with canonical URL.");
+        return sendSdcDisplayQuestionnaireAsync(questionnaireCanonicalUrl, questionnaireResponse, null, null, null, buildLaunchContext(patient, encounter, user), responseHandler);
     }
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SmartMessageHandler.class);

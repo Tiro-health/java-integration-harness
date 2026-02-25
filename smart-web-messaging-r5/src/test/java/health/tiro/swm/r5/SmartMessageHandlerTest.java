@@ -225,7 +225,7 @@ class SmartMessageHandlerTest {
                 null,
                 null,
                 null,
-                null,
+                (Practitioner) null,
                 null
         );
 
@@ -258,7 +258,7 @@ class SmartMessageHandlerTest {
                 qr,
                 null,
                 null,
-                null,
+                (Practitioner) null,
                 null
         );
 
@@ -322,7 +322,7 @@ class SmartMessageHandlerTest {
                 null,
                 null,
                 null,
-                null,
+                (Practitioner) null,
                 receivedResponse::set
         );
 
@@ -351,7 +351,7 @@ class SmartMessageHandlerTest {
                 null,
                 null,
                 null,
-                null,
+                (Practitioner) null,
                 receivedResponse::set
         );
 
@@ -380,7 +380,7 @@ class SmartMessageHandlerTest {
                 null,
                 null,
                 null,
-                null,
+                (Practitioner) null,
                 response -> {}
         );
 
@@ -402,7 +402,7 @@ class SmartMessageHandlerTest {
                     null,
                     null,
                     null,
-                    null,
+                    (Practitioner) null,
                     null
             );
         });
@@ -421,7 +421,7 @@ class SmartMessageHandlerTest {
                 null,
                 null,
                 null,
-                null,
+                (Practitioner) null,
                 null
         );
 
@@ -475,6 +475,117 @@ class SmartMessageHandlerTest {
     }
 
     @Test
+    void sendSdcDisplayQuestionnaireAsync_withPractitionerRoleAsUser() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Patient patient = new Patient();
+        patient.setId("patient-123");
+
+        PractitionerRole practitionerRole = new PractitionerRole();
+        practitionerRole.setId("practitioner-role-789");
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                new Questionnaire(),
+                null,
+                patient,
+                null,
+                practitionerRole,
+                null
+        );
+
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        JsonNode launchContext = messageNode.get("payload").get("context").get("launchContext");
+
+        List<String> names = new ArrayList<>();
+        for (JsonNode ctx : launchContext) {
+            names.add(ctx.get("name").asText());
+        }
+
+        assertTrue(names.contains("patient"));
+        assertTrue(names.contains("user"));
+
+        // Verify the user resource is a PractitionerRole
+        for (JsonNode ctx : launchContext) {
+            if ("user".equals(ctx.get("name").asText())) {
+                assertEquals("PractitionerRole", ctx.get("contentResource").get("resourceType").asText());
+            }
+        }
+    }
+
+    @Test
+    void sendSdcDisplayQuestionnaireAsync_withPatientAsUser() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Patient patient = new Patient();
+        patient.setId("patient-123");
+
+        Patient userPatient = new Patient();
+        userPatient.setId("user-patient-456");
+
+        handler.sendSdcDisplayQuestionnaireAsync(
+                new Questionnaire(),
+                null,
+                patient,
+                null,
+                userPatient,
+                null
+        );
+
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        JsonNode launchContext = messageNode.get("payload").get("context").get("launchContext");
+
+        List<String> names = new ArrayList<>();
+        for (JsonNode ctx : launchContext) {
+            names.add(ctx.get("name").asText());
+        }
+
+        assertTrue(names.contains("patient"));
+        assertTrue(names.contains("user"));
+        assertEquals(2, launchContext.size());
+    }
+
+    @Test
+    void sendSdcConfigureContextAsync_withPractitionerRoleAsUser() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        Patient patient = new Patient();
+        patient.setId("patient-123");
+
+        PractitionerRole practitionerRole = new PractitionerRole();
+        practitionerRole.setId("practitioner-role-789");
+
+        handler.sendSdcConfigureContextAsync(
+                patient,
+                null,
+                practitionerRole,
+                null
+        );
+
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        JsonNode launchContext = messageNode.get("payload").get("launchContext");
+
+        List<String> names = new ArrayList<>();
+        for (JsonNode ctx : launchContext) {
+            names.add(ctx.get("name").asText());
+        }
+
+        assertTrue(names.contains("patient"));
+        assertTrue(names.contains("user"));
+    }
+
+    @Test
     void sendSdcDisplayQuestionnaireAsync_partialContext() throws Exception {
         AtomicReference<String> sentMessage = new AtomicReference<>();
         handler.setMessageSender(msg -> {
@@ -485,13 +596,13 @@ class SmartMessageHandlerTest {
         Patient patient = new Patient();
         patient.setId("patient-123");
 
-        // Only patient, no encounter or author
+        // Only patient, no encounter or user
         handler.sendSdcDisplayQuestionnaireAsync(
                 new Questionnaire(),
                 null,
                 patient,
                 null,
-                null,
+                (Practitioner) null,
                 null
         );
 
