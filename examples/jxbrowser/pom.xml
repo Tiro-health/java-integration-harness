@@ -45,6 +45,10 @@
             <artifactId>form-filler-swing-jxbrowser</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>ca.uhn.hapi.fhir</groupId>
+            <artifactId>hapi-fhir-client</artifactId>
+        </dependency>
 
         <!-- JxBrowser Core -->
         <dependency>

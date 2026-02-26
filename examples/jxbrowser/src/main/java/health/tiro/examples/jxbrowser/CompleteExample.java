@@ -4,6 +4,7 @@ import health.tiro.swm.r5.SmartMessageHandler;
 import health.tiro.formfiller.swing.*;
 import health.tiro.formfiller.swing.jxbrowser.*;
 
+import ca.uhn.fhir.rest.client.api.IGenericClient;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r5.model.*;
 
@@ -28,6 +29,7 @@ public class CompleteExample {
     private static final Map<String, QuestionnaireResponse> savedResponses = new HashMap<>();
     private static String currentTemplateUrl = null;
     private static PractitionerRole selectedRole = null;
+    private static JButton extractButton = null;
 
     public static void main(String[] args) {
         try {
@@ -78,27 +80,42 @@ public class CompleteExample {
                 public void onFormSubmitted(IBaseResource response, IBaseResource outcome) {
                     if (currentTemplateUrl != null && response instanceof QuestionnaireResponse) {
                         savedResponses.put(currentTemplateUrl, (QuestionnaireResponse) response);
+                        if (extractButton != null) extractButton.setEnabled(true);
                     }
                     String json = forR5Cached().newJsonParser().setPrettyPrint(true).setParserErrorHandler(new ca.uhn.fhir.parser.LenientErrorHandler()).encodeResourceToString(response);
                     System.out.println("Form submitted:\n" + json);
 
-                    // Show the narrative in a popup
-                    String narrative = null;
+                    // Show the plaintext narrative in a popup
+                    String plaintext = null;
                     if (response instanceof DomainResource) {
                         Narrative text = ((DomainResource) response).getText();
-                        if (text != null) narrative = text.getDivAsString();
+                        if (text != null) {
+                            for (Extension ext : text.getExtension()) {
+                                if ("http://fhir.tiro.health/StructureDefinition/narrative-alternative-format".equals(ext.getUrl())
+                                        && ext.getValue() instanceof Attachment) {
+                                    Attachment att = (Attachment) ext.getValue();
+                                    if ("text/plain".equals(att.getContentType()) && att.getData() != null) {
+                                        plaintext = new String(java.util.Base64.getDecoder().decode(att.getData()), java.nio.charset.StandardCharsets.UTF_8);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
 
-                    if (narrative != null) {
-                        JEditorPane htmlPane = new JEditorPane("text/html", narrative);
-                        htmlPane.setEditable(false);
-                        JScrollPane scrollPane = new JScrollPane(htmlPane);
+                    if (plaintext != null) {
+                        JTextArea textArea = new JTextArea(plaintext);
+                        textArea.setEditable(false);
+                        textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+                        textArea.setLineWrap(true);
+                        textArea.setWrapStyleWord(true);
+                        JScrollPane scrollPane = new JScrollPane(textArea);
                         scrollPane.setPreferredSize(new Dimension(600, 400));
                         JOptionPane.showMessageDialog(frame, scrollPane,
                                 "Form Submitted", JOptionPane.PLAIN_MESSAGE);
                     } else {
                         JOptionPane.showMessageDialog(frame,
-                                "QuestionnaireResponse submitted (no narrative).",
+                                "QuestionnaireResponse submitted (no plaintext narrative).",
                                 "Form Submitted", JOptionPane.INFORMATION_MESSAGE);
                     }
                 }
@@ -338,11 +355,71 @@ public class CompleteExample {
                 loadTemplate(handler, templateCombo.getSelectedIndex(), patient, encounter)
         );
 
+        // Extract button
+        extractButton = new JButton("Extract");
+        extractButton.setEnabled(false);
+        extractButton.addActionListener(e -> {
+            QuestionnaireResponse qr = savedResponses.get(currentTemplateUrl);
+            if (qr == null) return;
+            extractButton.setEnabled(false);
+            extractButton.setText("Extracting...");
+            new Thread(() -> {
+                try {
+                    String serverBase = "http://localhost:8000/fhir/r5";
+                    ca.uhn.fhir.context.FhirContext ctx = forR5Cached();
+                    ctx.getRestfulClientFactory().setServerValidationMode(
+                            ca.uhn.fhir.rest.client.api.ServerValidationModeEnum.NEVER);
+                    IGenericClient client = ctx.newRestfulGenericClient(serverBase);
+                    client.registerInterceptor(new ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor(true));
+                    Parameters inParams = new Parameters();
+                    if (qr.hasSubject() && qr.getSubject().hasReference()) {
+                        // inParams.addParameter().setName("subject").setValue(qr.getSubject());
+                        // hardcode for now
+                        inParams.addParameter().setName("subject").setValue(new StringType("Patient/test-patient-001"));
+
+                    }
+                    inParams.addParameter().setName("questionnaire-response").setResource(qr);
+                    Bundle bundle = client.operation()
+                            .onType(QuestionnaireResponse.class)
+                            .named("$extract")
+                            .withParameters(inParams)
+                            .returnResourceType(Bundle.class)
+                            .execute();
+                    String json = ctx.newJsonParser().setPrettyPrint(true)
+                            .encodeResourceToString(bundle);
+                    SwingUtilities.invokeLater(() -> {
+                        JTextArea textArea = new JTextArea(json);
+                        textArea.setEditable(false);
+                        textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+                        JScrollPane scrollPane = new JScrollPane(textArea);
+                        scrollPane.setPreferredSize(new Dimension(600, 400));
+                        JOptionPane.showMessageDialog(
+                                SwingUtilities.getWindowAncestor(extractButton),
+                                scrollPane, "Extracted Bundle", JOptionPane.PLAIN_MESSAGE);
+                        extractButton.setEnabled(true);
+                        extractButton.setText("Extract");
+                    });
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(
+                                SwingUtilities.getWindowAncestor(extractButton),
+                                "Extract failed: " + ex.getMessage(),
+                                "Error", JOptionPane.ERROR_MESSAGE);
+                        extractButton.setEnabled(true);
+                        extractButton.setText("Extract");
+                    });
+                }
+            }).start();
+        });
+
         selector.add(practitionerLabel);
         selector.add(practitionerCombo);
         selector.add(Box.createHorizontalStrut(12));
         selector.add(templateLabel);
         selector.add(templateCombo);
+        selector.add(Box.createHorizontalStrut(12));
+        selector.add(extractButton);
         topBar.add(title, BorderLayout.WEST);
         topBar.add(selector, BorderLayout.EAST);
 
