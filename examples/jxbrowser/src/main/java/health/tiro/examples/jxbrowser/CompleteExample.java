@@ -142,7 +142,7 @@ public class CompleteExample {
 
     private static Patient createPatient() {
         Patient patient = new Patient();
-        patient.setId("patient-001");
+        patient.setId("test-patient-001");
         patient.addName(new HumanName()
                 .setFamily("Peeters")
                 .addGiven("Marc")
