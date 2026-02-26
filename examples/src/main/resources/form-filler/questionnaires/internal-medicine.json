@@ -1,0 +1,645 @@
+{
+  "resourceType": "Questionnaire",
+  "url": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3",
+  "status": "draft",
+  "name": "Interne Geneeskunde Verslag",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtract",
+      "extension": [
+        {
+          "url": "template",
+          "valueReference": {
+            "reference": "#composition-template"
+          }
+        }
+      ]
+    }
+  ],
+  "contained": [
+    {
+      "resourceType": "Composition",
+      "id": "composition-template",
+      "status": "final",
+      "type": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "11488-4",
+            "display": "Consultation note"
+          }
+        ]
+      },
+      "title": "Interne Geneeskunde Verslag",
+      "section": [
+        {
+          "title": "Verwijzende Collega",
+          "text": {
+            "status": "generated",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><style>.card{background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:16px;border-left:4px solid #28a745}.label{color:#666;font-size:0.9em;margin-bottom:4px}.value{font-size:1.1em;font-weight:500;color:#333}</style><div class=\"card\"><div class=\"label\">Naam collega</div><div class=\"value\">{{ %resource.item.where(linkId='verwijzende-collega-group').item.where(linkId='collega').answer.valueCoding.display.first() }}</div></div></div>"
+          }
+        },
+        {
+          "title": "Vitale Parameters",
+          "text": {
+            "status": "generated",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><style>.vitals-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}.vital-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:12px;padding:20px;color:white}.vital-card.weight{background:linear-gradient(135deg,#11998e 0%,#38ef7d 100%)}.vital-label{font-size:0.85em;opacity:0.9;margin-bottom:8px}.vital-value{font-size:2em;font-weight:700}.vital-unit{font-size:0.5em;opacity:0.8;margin-left:4px}h3{color:#333;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:24px}.history-table{width:100%;border-collapse:collapse;margin-top:12px}.history-table th{background:#f1f3f4;padding:12px;text-align:left;font-weight:600;color:#333}.history-table td{padding:12px;border-bottom:1px solid #eee}.history-table tr:hover{background:#f8f9fa}</style><h3>Bloeddruk</h3><div class=\"vitals-grid\"><div class=\"vital-card\"><div class=\"vital-label\">Systolisch</div><div class=\"vital-value\">{{ %resource.item.where(linkId='019d8725-aab3-8233-cf4d-bea8612f2b11').item.where(linkId='019d8725-aab3-8233-cf4d-beb14a3c3c22').item.where(linkId='019d8725-aab3-8233-cf4d-bebc5d4e4d33').answer.valueDecimal.first() }}<span class=\"vital-unit\">mmHg</span></div></div><div class=\"vital-card\"><div class=\"vital-label\">Diastolisch</div><div class=\"vital-value\">{{ %resource.item.where(linkId='019d8725-aab3-8233-cf4d-bea8612f2b11').item.where(linkId='019d8725-aab3-8233-cf4d-beb14a3c3c22').item.where(linkId='019d8725-aab3-8233-cf4d-bec76e5f5e44').answer.valueDecimal.first() }}<span class=\"vital-unit\">mmHg</span></div></div></div><h3>Huidig Gewicht</h3><div class=\"vitals-grid\"><div class=\"vital-card weight\"><div class=\"vital-label\">Gewicht</div><div class=\"vital-value\">{{ %resource.item.where(linkId='019d8725-aab3-8233-cf4d-bea8612f2b11').item.where(linkId='019d8725-aab3-8233-cf4d-current-weight').item.where(linkId='019d8725-aab3-8233-cf4d-current-weight-value').answer.valueDecimal.first() }}<span class=\"vital-unit\">kg</span></div></div></div><h3>Gewicht Historie</h3><table class=\"history-table\"><thead><tr><th>Datum</th><th>Gewicht</th></tr></thead><tbody>{{%resource.item.where(linkId='019d8725-aab3-8233-cf4d-bea8612f2b11').item.where(linkId='019d8725-aab3-8233-cf4d-bed27f6g6f55').select('<tr><td>' + item.where(linkId=\\'019d8725-aab3-8233-cf4d-bee38g7h7g66\\').answer.valueDate.first() + '</td><td>' + item.where(linkId=\\'019d8725-aab3-8233-cf4d-bedd9h8i8h77\\').answer.valueDecimal.first().toString() + ' kg</td></tr>').join('')}}</tbody></table></div>"
+          }
+        }
+      ]
+    }
+  ],
+  "item": [
+    {
+      "linkId": "verwijzende-collega-group",
+      "type": "group",
+      "text": "Verwijzende collega",
+      "code": [
+        {
+          "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+          "code": "verwijzende_collega",
+          "display": "verwijzende_collega"
+        }
+      ],
+      "repeats": false,
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          "valueCodeableConcept": {
+            "text": "block",
+            "coding": [
+              {
+                "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                "code": "block"
+              }
+            ]
+          }
+        },
+        {
+          "url": "http://fhir.tiro.health/StructureDefinition/narrative-template-snippet",
+          "valueExpression": {
+            "name": "verwijzende-collega-group",
+            "expression": "{%- assign collega = item | fhirpath : \"item.where(linkId='collega')\" | first -%}\n{%- if item.text -%}\n{%- assign GroupTitle = item.text -%}\n<h2>{{ GroupTitle }}</h2>\n{%- endif -%}\n{%- render \"collega\", item:collega -%}\n",
+            "language": "text/liquid"
+          }
+        }
+      ],
+      "item": [
+        {
+          "linkId": "collega",
+          "type": "reference",
+          "text": "Naam collega",
+          "code": [
+            {
+              "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+              "code": "collega",
+              "display": "collega"
+            }
+          ],
+          "repeats": false,
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+              "valueCodeableConcept": {
+                "text": "dropdown",
+                "coding": [
+                  {
+                    "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                    "code": "dropdown"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "http://fhir.tiro.health/StructureDefinition/narrative-template-snippet",
+              "valueExpression": {
+                "name": "collega",
+                "expression": "{%- assign Question = item.text | default: item.linkId -%}\n{%- assign Answer = item.answer[0].valueCoding.display -%}\n{%- if Answer -%}\n<div>{{Question}}: {{ Answer }}</div>\n{%- endif -%}\n",
+                "language": "text/liquid"
+              }
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerExpression",
+              "valueExpression": {
+                "language": "application/x-fhir-query",
+                "expression": "PractitionerRole?specialty={{%user.specialty.coding.where(system='http://snomed.info/sct').first()}}"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "019d8725-aab3-8233-cf4d-bea8612f2b11",
+      "type": "group",
+      "text": "Vitale parameters",
+      "code": [
+        {
+          "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+          "code": "vitale_parameters",
+          "display": "vitale_parameters"
+        }
+      ],
+      "repeats": false,
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          "valueCodeableConcept": {
+            "text": "block",
+            "coding": [
+              {
+                "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                "code": "block"
+              }
+            ]
+          }
+        },
+        {
+          "url": "http://fhir.tiro.health/StructureDefinition/narrative-template-snippet",
+          "valueExpression": {
+            "name": "019d8725-aab3-8233-cf4d-bea8612f2b11",
+            "expression": "{%- assign bloeddruk = item | fhirpath : \"item.where(linkId='019d8725-aab3-8233-cf4d-beb14a3c3c22')\" | first -%}\n{%- assign gewicht_historie = item | fhirpath : \"item.where(linkId='019d8725-aab3-8233-cf4d-bed27f6g6f55')\" -%}\n{%- if item.text -%}\n{%- assign GroupTitle = item.text -%}\n<h2>{{ GroupTitle }}</h2>\n{%- endif -%}\n{%- render \"019d8725-aab3-8233-cf4d-beb14a3c3c22\", item:bloeddruk -%}\n{%- for group in gewicht_historie -%}\n{%- render \"019d8725-aab3-8233-cf4d-bed27f6g6f55\", item:group, index:forloop.index0 -%}\n{%- endfor -%}\n",
+            "language": "text/liquid"
+          }
+        }
+      ],
+      "item": [
+        {
+          "linkId": "019d8725-aab3-8233-cf4d-beb14a3c3c22",
+          "type": "group",
+          "text": "Bloeddruk",
+          "definition": "http://hl7.org/fhir/StructureDefinition/bp",
+          "code": [
+            {
+              "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+              "code": "bloeddruk",
+              "display": "bloeddruk"
+            },
+            {
+              "system": "http://snomed.info/sct",
+              "code": "75367002",
+              "display": "Blood pressure"
+            }
+          ],
+          "repeats": false,
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+              "valueCodeableConcept": {
+                "text": "list",
+                "coding": [
+                  {
+                    "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                    "code": "list"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "http://fhir.tiro.health/StructureDefinition/narrative-template-snippet",
+              "valueExpression": {
+                "name": "019d8725-aab3-8233-cf4d-beb14a3c3c22",
+                "expression": "{%- assign systolische_bloeddruk = item | fhirpath : \"item.where(linkId='019d8725-aab3-8233-cf4d-bebc5d4e4d33')\" | first -%}\n{%- assign diastolische_bloeddruk = item | fhirpath : \"item.where(linkId='019d8725-aab3-8233-cf4d-bec76e5f5e44')\" | first -%}\n{%- if item.text -%}\n{%- assign GroupTitle = item.text -%}\n<h2>{{ GroupTitle }}</h2>\n{%- endif -%}\n{%- render \"019d8725-aab3-8233-cf4d-bebc5d4e4d33\", item:systolische_bloeddruk -%}\n{%- render \"019d8725-aab3-8233-cf4d-bec76e5f5e44\", item:diastolische_bloeddruk -%}\n",
+                "language": "text/liquid"
+              }
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
+              "valueExpression": {
+                "name": "bpObs",
+                "language": "application/x-fhir-query",
+                "expression": "Observation?patient={{%patient.id}}&code=http://loinc.org|85354-9&_sort=-date&_count=1"
+              }
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://hl7.org/fhir/StructureDefinition/bp"
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueUri": "http://hl7.org/fhir/StructureDefinition/bp#Observation.status"
+                },
+                { "url": "fixed-value", "valueCode": "final" }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueUri": "http://hl7.org/fhir/StructureDefinition/bp#Observation.code"
+                },
+                {
+                  "url": "fixed-value",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "http://loinc.org",
+                        "code": "85354-9",
+                        "display": "Blood pressure panel"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueUri": "http://hl7.org/fhir/StructureDefinition/bp#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%subject"
+                  }
+                }
+              ]
+            }
+          ],
+          "item": [
+            {
+              "linkId": "019d8725-aab3-8233-cf4d-bebc5d4e4d33",
+              "type": "decimal",
+              "text": "Systolische bloeddruk",
+              "definition": "http://hl7.org/fhir/StructureDefinition/bp#Observation.component:SystolicBP.value[x]",
+              "code": [
+                {
+                  "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+                  "code": "systolische_bloeddruk",
+                  "display": "systolische_bloeddruk"
+                },
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "271649006",
+                  "display": "Systolic blood pressure"
+                }
+              ],
+              "repeats": false,
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                  "valueCodeableConcept": {
+                    "text": "decimal-field",
+                    "coding": [
+                      {
+                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                        "code": "decimal-field"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "url": "http://fhir.tiro.health/StructureDefinition/narrative-template-snippet",
+                  "valueExpression": {
+                    "name": "019d8725-aab3-8233-cf4d-bebc5d4e4d33",
+                    "expression": "{%- assign Question = item.text | default: item.linkId -%}\n{%- assign Answer_display = item.answer[0].valueDecimal -%}\n{%- assign Answer_unit = item | unit -%}\n{%- if Answer_display -%}\n{%- assign Answer = Answer_display | append: ' ' | append: Answer_unit -%}\n{%- endif -%}\n{%- if Answer -%}\n<div>{{Question}}: {{ Answer }}</div>\n{%- endif -%}\n",
+                    "language": "text/liquid"
+                  }
+                },
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+                  "valueCoding": {
+                    "system": "http://unitsofmeasure.org",
+                    "code": "mm[Hg]",
+                    "display": "mmHg"
+                  }
+                }
+              ]
+            },
+            {
+              "linkId": "019d8725-aab3-8233-cf4d-bec76e5f5e44",
+              "type": "decimal",
+              "text": "Diastolische bloeddruk",
+              "definition": "http://hl7.org/fhir/StructureDefinition/bp#Observation.component:DiastolicBP.value[x]",
+              "code": [
+                {
+                  "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+                  "code": "diastolische_bloeddruk",
+                  "display": "diastolische_bloeddruk"
+                },
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "271650006",
+                  "display": "Diastolic blood pressure"
+                }
+              ],
+              "repeats": false,
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                  "valueCodeableConcept": {
+                    "text": "decimal-field",
+                    "coding": [
+                      {
+                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                        "code": "decimal-field"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "url": "http://fhir.tiro.health/StructureDefinition/narrative-template-snippet",
+                  "valueExpression": {
+                    "name": "019d8725-aab3-8233-cf4d-bec76e5f5e44",
+                    "expression": "{%- assign Question = item.text | default: item.linkId -%}\n{%- assign Answer_display = item.answer[0].valueDecimal -%}\n{%- assign Answer_unit = item | unit -%}\n{%- if Answer_display -%}\n{%- assign Answer = Answer_display | append: ' ' | append: Answer_unit -%}\n{%- endif -%}\n{%- if Answer -%}\n<div>{{Question}}: {{ Answer }}</div>\n{%- endif -%}\n",
+                    "language": "text/liquid"
+                  }
+                },
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+                  "valueCoding": {
+                    "system": "http://unitsofmeasure.org",
+                    "code": "mm[Hg]",
+                    "display": "mmHg"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "linkId": "019d8725-aab3-8233-cf4d-bed27f6g6f55",
+          "type": "group",
+          "text": "Gewicht historie",
+          "definition": "http://hl7.org/fhir/StructureDefinition/bodyweight",
+          "code": [
+            {
+              "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+              "code": "gewicht_historie",
+              "display": "gewicht_historie"
+            },
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ],
+          "repeats": true,
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+              "valueCodeableConcept": {
+                "text": "table",
+                "coding": [
+                  {
+                    "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                    "code": "table"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "http://fhir.tiro.health/StructureDefinition/narrative-template-snippet",
+              "valueExpression": {
+                "name": "019d8725-aab3-8233-cf4d-bed27f6g6f55",
+                "expression": "{%- assign gewicht = item | fhirpath : \"item.where(linkId='019d8725-aab3-8233-cf4d-bedd9h8i8h77')\" | first -%}\n{%- assign meetdatum = item | fhirpath : \"item.where(linkId='019d8725-aab3-8233-cf4d-bee38g7h7g66')\" | first -%}\n{%- assign GroupTitle = item.text -%}\n{%- if item.text -%}\n<h2>{{ GroupTitle }} #{{ index | plus: 1 }}</h2>\n{%- endif -%}\n{%- render \"019d8725-aab3-8233-cf4d-bedd9h8i8h77\", item:gewicht -%}\n{%- render \"019d8725-aab3-8233-cf4d-bee38g7h7g66\", item:meetdatum -%}\n",
+                "language": "text/liquid"
+              }
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
+              "valueExpression": {
+                "name": "weightObs",
+                "language": "application/x-fhir-query",
+                "expression": "Observation?patient={{%patient.id}}&code=http://loinc.org|29463-7&_sort=-date&_count=3"
+              }
+            }
+          ],
+          "item": [
+            {
+              "linkId": "019d8725-aab3-8233-cf4d-bedd9h8i8h77",
+              "type": "decimal",
+              "text": "Gewicht",
+              "definition": "http://hl7.org/fhir/StructureDefinition/bodyweight#Observation.valueQuantity",
+              "readOnly": true,
+              "code": [
+                {
+                  "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+                  "code": "gewicht",
+                  "display": "gewicht"
+                },
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "27113001",
+                  "display": "Body weight"
+                }
+              ],
+              "repeats": false,
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                  "valueCodeableConcept": {
+                    "text": "decimal-field",
+                    "coding": [
+                      {
+                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                        "code": "decimal-field"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+                  "valueCoding": {
+                    "system": "http://unitsofmeasure.org",
+                    "code": "kg",
+                    "display": "kg"
+                  }
+                }
+              ]
+            },
+            {
+              "linkId": "019d8725-aab3-8233-cf4d-bee38g7h7g66",
+              "type": "date",
+              "text": "Meetdatum",
+              "definition": "http://hl7.org/fhir/StructureDefinition/bodyweight#Observation.effectiveDateTime",
+              "readOnly": true,
+              "code": [
+                {
+                  "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+                  "code": "meetdatum",
+                  "display": "meetdatum"
+                }
+              ],
+              "repeats": false,
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                  "valueCodeableConcept": {
+                    "text": "date-field",
+                    "coding": [
+                      {
+                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                        "code": "date-field"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "linkId": "019d8725-aab3-8233-cf4d-current-weight",
+          "type": "group",
+          "text": "Huidig gewicht",
+          "definition": "http://hl7.org/fhir/StructureDefinition/bodyweight",
+          "code": [
+            {
+              "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+              "code": "huidig_gewicht",
+              "display": "huidig_gewicht"
+            },
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ],
+          "repeats": false,
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+              "valueCodeableConcept": {
+                "text": "list",
+                "coding": [
+                  {
+                    "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                    "code": "list"
+                  }
+                ]
+              }
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://hl7.org/fhir/StructureDefinition/bodyweight"
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueUri": "http://hl7.org/fhir/StructureDefinition/bodyweight#Observation.status"
+                },
+                { "url": "fixed-value", "valueCode": "final" }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueUri": "http://hl7.org/fhir/StructureDefinition/bodyweight#Observation.code"
+                },
+                {
+                  "url": "fixed-value",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "http://loinc.org",
+                        "code": "29463-7",
+                        "display": "Body weight"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueUri": "http://hl7.org/fhir/StructureDefinition/bodyweight#Observation.effectiveDateTime"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "now()"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueUri": "http://hl7.org/fhir/StructureDefinition/bodyweight#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%subject"
+                  }
+                }
+              ]
+            }
+          ],
+          "item": [
+            {
+              "linkId": "019d8725-aab3-8233-cf4d-current-weight-value",
+              "type": "decimal",
+              "text": "Gewicht",
+              "definition": "http://hl7.org/fhir/StructureDefinition/bodyweight#Observation.valueQuantity",
+              "code": [
+                {
+                  "system": "http://templates.tiro.health/templates/8f9fce1ddfb55fc7b9727f39eb8c2bf3/technical-key",
+                  "code": "huidig_gewicht_waarde",
+                  "display": "huidig_gewicht_waarde"
+                },
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "27113001",
+                  "display": "Body weight"
+                }
+              ],
+              "repeats": false,
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                  "valueCodeableConcept": {
+                    "text": "decimal-field",
+                    "coding": [
+                      {
+                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                        "code": "decimal-field"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+                  "valueCoding": {
+                    "system": "http://unitsofmeasure.org",
+                    "code": "kg",
+                    "display": "kg"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

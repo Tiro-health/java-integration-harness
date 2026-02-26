@@ -1,29 +1,360 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Form Viewer</title>
-    <script src="https://cdn.tiro.health/sdk/v0.2.1/tiro-web-sdk.iife.js"></script>
-  </head>
-  <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-    <main style="max-width: 64rem; margin: 0 auto; padding: 1rem 2rem;">
-      <!-- Toolbar -->
-      <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 0.75rem;">
-        <button onclick="SmartWebMessaging.saveProgress()"
-          style="padding: 6px 12px; font-size: 14px; font-weight: 500; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; cursor: pointer;">
-          Save Progress
-        </button>
-        <button onclick="SmartWebMessaging.validate()"
-          style="padding: 6px 12px; font-size: 14px; font-weight: 500; border: none; border-radius: 6px; background: #2563eb; color: white; cursor: pointer;">
-          Validate
-        </button>
-      </div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>KWS - POC</title>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Oxygen, Ubuntu, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 2rem;
+                background: #f5f5f5;
+            }
+            h1 {
+                color: #333;
+                margin-bottom: 1.5rem;
+            }
+            .controls {
+                margin-bottom: 1.5rem;
+            }
+            label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+                color: #555;
+            }
+            select {
+                padding: 0.5rem 1rem;
+                font-size: 1rem;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background: white;
+                cursor: pointer;
+            }
+            select:focus {
+                outline: none;
+                border-color: #0066cc;
+            }
+            .form-container {
+                background: white;
+                border-radius: 8px;
+                padding: 1.5rem;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            tiro-form-filler {
+                display: block;
+            }
+            .loading {
+                color: #666;
+                font-style: italic;
+            }
+            .actions {
+                margin-top: 1.5rem;
+                display: flex;
+                gap: 1rem;
+            }
+            .btn {
+                padding: 0.75rem 1.5rem;
+                font-size: 1rem;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: 500;
+            }
+            .btn-primary {
+                background: #0066cc;
+                color: white;
+            }
+            .btn-primary:hover {
+                background: #0052a3;
+            }
+            .btn-primary:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+            .result-container {
+                margin-top: 1.5rem;
+                background: white;
+                border-radius: 8px;
+                padding: 1.5rem;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                display: none;
+            }
+            .result-container.visible {
+                display: block;
+            }
+            .result-container h3 {
+                margin-top: 0;
+                color: #333;
+            }
+            .result-container pre {
+                background: #f8f8f8;
+                padding: 1rem;
+                border-radius: 4px;
+                overflow-x: auto;
+                font-size: 0.85rem;
+            }
+            .pdf-viewer {
+                width: 100%;
+                height: 600px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            .pdf-viewer.hidden {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Tiro.health Web SDK Demo</h1>
 
-      <tiro-form-filler
-        id="form-filler"
-        sdc-endpoint-address="https://sdc.tiro.health/fhir/r5"
-      ></tiro-form-filler>
-    </main>
-  </body>
+        <div class="controls">
+            <label for="questionnaire-select">Select Questionnaire:</label>
+            <select id="questionnaire-select"></select>
+        </div>
+
+        <div class="form-container">
+            <tiro-form-filler
+                id="form-filler"
+                sdc-endpoint-address="http://localhost:8000/fhir/r5"
+                data-endpoint-address="http://fhir-server:5826/fhir/r5"
+            >
+                <script
+                    type="application/fhir+json"
+                    slot="questionnaire"
+                    id="questionnaire-script"
+                ></script>
+            </tiro-form-filler>
+        </div>
+
+        <div class="actions">
+            <button id="submit-btn" class="btn btn-primary">
+                Submit & Extract
+            </button>
+        </div>
+
+        <div id="result-container" class="result-container">
+            <h3>Extraction Result</h3>
+            <iframe id="pdf-viewer" class="pdf-viewer hidden"></iframe>
+            <pre id="result-output"></pre>
+        </div>
+
+        <script>
+            const sdcServerUrl = "http://localhost:8000/fhir/r5";
+            const select = document.getElementById("questionnaire-select");
+            let currentQuestionnaire = null; // Store loaded questionnaire for extraction
+
+            // Helper function to find PDF in a FHIR Bundle
+            function findPdfInBundle(bundle) {
+                if (
+                    !bundle ||
+                    bundle.resourceType !== "Bundle" ||
+                    !Array.isArray(bundle.entry)
+                ) {
+                    return null;
+                }
+
+                for (const entry of bundle.entry) {
+                    const resource = entry.resource;
+                    if (
+                        resource &&
+                        resource.resourceType === "DocumentReference"
+                    ) {
+                        const contents = resource.content;
+                        if (Array.isArray(contents)) {
+                            for (const content of contents) {
+                                const attachment = content.attachment;
+                                if (
+                                    attachment &&
+                                    attachment.contentType ===
+                                        "application/pdf" &&
+                                    attachment.data
+                                ) {
+                                    return {
+                                        data: attachment.data,
+                                        title:
+                                            attachment.title || "document.pdf",
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            async function loadManifest() {
+                const response = await fetch("questionnaires/manifest.json");
+                const manifest = await response.json();
+                select.innerHTML = "";
+                for (const item of manifest) {
+                    const option = document.createElement("option");
+                    option.value = item.id;
+                    option.textContent = item.title;
+                    select.appendChild(option);
+                }
+                return manifest;
+            }
+
+            async function loadQuestionnaire(name) {
+                try {
+                    const response = await fetch(`questionnaires/${name}.json`);
+                    if (!response.ok) {
+                        throw new Error(
+                            `Failed to load questionnaire: ${response.status}`,
+                        );
+                    }
+                    const questionnaire = await response.json();
+                    currentQuestionnaire = questionnaire; // Store for extraction
+
+                    // Get fresh reference to current form filler
+                    const currentFormFiller =
+                        document.getElementById("form-filler");
+                    const container = document.querySelector(".form-container");
+
+                    currentFormFiller.setAttribute(
+                        "questionnaire",
+                        JSON.stringify(questionnaire),
+                    );
+                } catch (error) {
+                    console.error("Error loading questionnaire:", error);
+                    alert(
+                        "Failed to load questionnaire. Make sure you are running a local server.",
+                    );
+                }
+            }
+
+            select.addEventListener("change", (e) => {
+                loadQuestionnaire(e.target.value);
+            });
+
+            // Submit button handler
+            const submitBtn = document.getElementById("submit-btn");
+            const resultContainer = document.getElementById("result-container");
+            const resultOutput = document.getElementById("result-output");
+            const pdfViewer = document.getElementById("pdf-viewer");
+
+            submitBtn.addEventListener("click", async () => {
+                const formFiller = document.getElementById("form-filler");
+                if (formFiller && formFiller.submit) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = "Submitting...";
+                    try {
+                        await formFiller.submit();
+                    } catch (error) {
+                        console.error("Submit error:", error);
+                        alert("Failed to submit form: " + error.message);
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = "Submit & Extract";
+                    }
+                }
+            });
+
+            // Listen for submit events and call $extract
+            document.addEventListener("tiro-submit", async (e) => {
+                console.log("Form submitted:", e.detail);
+
+                const questionnaireResponse = e.detail.response;
+
+                const sdcClient = new TiroWebSdk.SDCClient({
+                    baseUrl: sdcServerUrl,
+                });
+
+                try {
+                    submitBtn.textContent = "Extracting...";
+
+                    const extractResult = await sdcClient.extract({
+                        questionnaireResponse: questionnaireResponse,
+                        questionnaire: currentQuestionnaire,
+                        subject: "Patient/test-patient-001",
+                    });
+
+                    console.log("Extract result:", extractResult);
+
+                    // Get the transaction bundle from the result
+                    const transactionBundle = extractResult.parameters;
+
+                    if (
+                        transactionBundle &&
+                        transactionBundle.resourceType === "Bundle"
+                    ) {
+                        submitBtn.textContent = "Saving to FHIR...";
+
+                        // POST the transaction bundle via SDC server proxy
+                        const saveResponse = await fetch(sdcServerUrl, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/fhir+json",
+                            },
+                            body: JSON.stringify(transactionBundle),
+                        });
+
+                        if (!saveResponse.ok) {
+                            throw new Error(
+                                `Failed to save: ${saveResponse.status} ${saveResponse.statusText}`,
+                            );
+                        }
+
+                        const saveResult = await saveResponse.json();
+                        console.log("Save result:", saveResult);
+
+                        resultContainer.classList.add("visible");
+
+                        // Check if there's a PDF in the extracted bundle
+                        const pdf = findPdfInBundle(transactionBundle);
+                        if (pdf) {
+                            // Render PDF inline
+                            pdfViewer.src = `data:application/pdf;base64,${pdf.data}`;
+                            pdfViewer.classList.remove("hidden");
+                            resultOutput.style.display = "none";
+                        } else {
+                            // Fall back to JSON display
+                            pdfViewer.classList.add("hidden");
+                            pdfViewer.src = "";
+                            resultOutput.style.display = "block";
+                            resultOutput.textContent = JSON.stringify(
+                                {
+                                    extracted: extractResult,
+                                    saved: saveResult,
+                                },
+                                null,
+                                2,
+                            );
+                        }
+                    } else {
+                        resultContainer.classList.add("visible");
+                        pdfViewer.classList.add("hidden");
+                        pdfViewer.src = "";
+                        resultOutput.style.display = "block";
+                        resultOutput.textContent = JSON.stringify(
+                            extractResult,
+                            null,
+                            2,
+                        );
+                    }
+                } catch (error) {
+                    console.error("Extract/Save failed:", error);
+                    alert("Operation failed: " + error.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Submit & Extract";
+                }
+            });
+
+            // Load manifest and initial questionnaire
+            loadManifest().then((manifest) => {
+                if (manifest.length > 0) {
+                    loadQuestionnaire(manifest[0].id);
+                }
+            });
+        </script>
+        <script src="https://cdn.tiro.health/sdk-dev/v0.2.2-dev.4/tiro-web-sdk.iife.js"></script>
+    </body>
 </html>

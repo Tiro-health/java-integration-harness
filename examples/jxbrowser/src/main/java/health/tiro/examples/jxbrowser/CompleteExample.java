@@ -1,13 +1,13 @@
 package health.tiro.examples.jxbrowser;
 
-import health.tiro.swm.r4.SmartMessageHandler;
+import health.tiro.swm.r5.SmartMessageHandler;
 import health.tiro.formfiller.swing.*;
 import health.tiro.formfiller.swing.jxbrowser.*;
 
 import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.hl7.fhir.r4.model.*;
+import org.hl7.fhir.r5.model.*;
 
-import static ca.uhn.fhir.context.FhirContext.forR4Cached;
+import static ca.uhn.fhir.context.FhirContext.forR5Cached;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -42,7 +42,7 @@ public class CompleteExample {
             );
             SmartMessageHandler handler = new SmartMessageHandler();
             FormFillerConfig config = FormFillerConfig.builder()
-                    .targetUrl("http://localhost:8000")
+                    .targetUrl("http://127.0.0.1:8001")
                     .build();
             FormFiller filler = new FormFiller(config, browser, handler);
 
@@ -79,7 +79,7 @@ public class CompleteExample {
                     if (currentTemplateUrl != null && response instanceof QuestionnaireResponse) {
                         savedResponses.put(currentTemplateUrl, (QuestionnaireResponse) response);
                     }
-                    String json = forR4Cached().newJsonParser().setPrettyPrint(true).encodeResourceToString(response);
+                    String json = forR5Cached().newJsonParser().setPrettyPrint(true).setParserErrorHandler(new ca.uhn.fhir.parser.LenientErrorHandler()).encodeResourceToString(response);
                     System.out.println("Form submitted:\n" + json);
 
                     // Show the narrative in a popup
@@ -142,7 +142,7 @@ public class CompleteExample {
 
     private static Patient createPatient() {
         Patient patient = new Patient();
-        patient.setId("patient-001");
+        patient.setId("test-patient-001");
         patient.addName(new HumanName()
                 .setFamily("Peeters")
                 .addGiven("Marc")
@@ -162,27 +162,27 @@ public class CompleteExample {
                 .setDisplay("dr. Van Damme"));
         surgeon.addCode(new CodeableConcept().addCoding(new Coding()
                 .setSystem("http://snomed.info/sct")
-                .setCode("304292004")
-                .setDisplay("Surgeon")));
+                .setCode("419192003")
+                .setDisplay("Internal medicine")));
         surgeon.addSpecialty(new CodeableConcept().addCoding(new Coding()
                 .setSystem("http://snomed.info/sct")
-                .setCode("394609007")
-                .setDisplay("General surgery")));
+                .setCode("419192003")
+                .setDisplay("Internal medicine")));
 
-        PractitionerRole anesthesiologist = new PractitionerRole();
-        anesthesiologist.setId("role-002");
-        anesthesiologist.setPractitioner(new Reference("Practitioner/practitioner-002")
+        PractitionerRole cardiologist = new PractitionerRole();
+        cardiologist.setId("role-002");
+        cardiologist.setPractitioner(new Reference("Practitioner/practitioner-002")
                 .setDisplay("dr. Janssen"));
-        anesthesiologist.addCode(new CodeableConcept().addCoding(new Coding()
+        cardiologist.addCode(new CodeableConcept().addCoding(new Coding()
                 .setSystem("http://snomed.info/sct")
-                .setCode("88189002")
-                .setDisplay("Anesthesiologist")));
-        anesthesiologist.addSpecialty(new CodeableConcept().addCoding(new Coding()
+                .setCode("394579002")
+                .setDisplay("Cardiology")));
+        cardiologist.addSpecialty(new CodeableConcept().addCoding(new Coding()
                 .setSystem("http://snomed.info/sct")
-                .setCode("394577000")
-                .setDisplay("Anesthetics")));
+                .setCode("394579002")
+                .setDisplay("Cardiology")));
 
-        return new PractitionerRole[]{surgeon, anesthesiologist};
+        return new PractitionerRole[]{surgeon, cardiologist};
     }
 
     private static Encounter createEncounter(Patient patient) {

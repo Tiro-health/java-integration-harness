@@ -57,7 +57,9 @@ public abstract class AbstractSmartMessageHandler {
      * @param customObjectMapper  Custom ObjectMapper to use, or null for the default
      */
     protected AbstractSmartMessageHandler(FhirContext fhirContext, ObjectMapper customObjectMapper) {
-        this.fhirJsonParser = fhirContext.newJsonParser().setPrettyPrint(false);
+        this.fhirJsonParser = fhirContext.newJsonParser()
+                .setPrettyPrint(false)
+                .setParserErrorHandler(new ca.uhn.fhir.parser.LenientErrorHandler().setErrorOnInvalidValue(false));
         this.objectMapper = customObjectMapper != null ? customObjectMapper : createDefaultObjectMapper();
         logger.info("SmartMessageHandler initialized.");
     }

@@ -26,7 +26,7 @@ public class Main {
 
             // 3. Create the form filler
             FormFillerConfig config = FormFillerConfig.builder()
-                    .targetUrl("http://localhost:8000")
+                    .targetUrl("http://127.0.0.1:8001")
                     .build();
             FormFiller filler = new FormFiller(config, browser, handler);
 

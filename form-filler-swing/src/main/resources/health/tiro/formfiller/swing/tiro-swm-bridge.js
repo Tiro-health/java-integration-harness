@@ -129,7 +129,8 @@
 
       case "sdc.configureContext":
         context = message.payload;
-        console.log("[SWM] Context received");
+        applyLaunchContext(formFiller, context);
+        console.log("[SWM] Context updated");
         break;
 
       case "sdc.displayQuestionnaire":
@@ -164,6 +165,22 @@
   // Questionnaire display
   // ===========================================
 
+  function applyLaunchContext(formFiller, ctx) {
+    if (!formFiller || !ctx || !Array.isArray(ctx.launchContext)) return;
+    var launchContext = {};
+    ctx.launchContext.forEach(function (item) {
+      if (item.name && item.contentResource) {
+        launchContext[item.name] = item.contentResource;
+      }
+    });
+    if (Object.keys(launchContext).length > 0) {
+      formFiller.setAttribute(
+        "launch-context",
+        JSON.stringify(launchContext)
+      );
+    }
+  }
+
   function displayQuestionnaire(formFiller, payload) {
     var questionnaire = payload.questionnaire;
     var questionnaireResponse = payload.questionnaireResponse;
@@ -178,20 +195,7 @@
     }
 
     // Set launch context from host context
-    if (context && Array.isArray(context.launchContext)) {
-      var launchContext = {};
-      context.launchContext.forEach(function (item) {
-        if (item.name && item.contentResource) {
-          launchContext[item.name] = item.contentResource;
-        }
-      });
-      if (Object.keys(launchContext).length > 0) {
-        formFiller.setAttribute(
-          "launch-context",
-          JSON.stringify(launchContext)
-        );
-      }
-    }
+    applyLaunchContext(formFiller, context);
 
     // Set initial response if provided
     if (questionnaireResponse) {

@@ -38,7 +38,7 @@
         </dependency>
         <dependency>
             <groupId>health.tiro</groupId>
-            <artifactId>smart-web-messaging-r4</artifactId>
+            <artifactId>smart-web-messaging-r5</artifactId>
         </dependency>
         <dependency>
             <groupId>health.tiro</groupId>
