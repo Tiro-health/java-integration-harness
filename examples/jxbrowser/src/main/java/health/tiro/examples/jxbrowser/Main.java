@@ -26,7 +26,7 @@ public class Main {
 
             // 3. Create the form filler
             FormFillerConfig config = FormFillerConfig.builder()
-                    .targetUrl("http://127.0.0.1:8001")
+                    .sdcEndpointAddress("http://localhost:8000/fhir/r5")
                     .build();
             FormFiller filler = new FormFiller(config, browser, handler);
 
@@ -41,6 +41,14 @@ public class Main {
                 }
             });
             frame.setSize(1024, 768);
+
+            // Submit button
+            JButton submitButton = new JButton("Submit");
+            submitButton.addActionListener(e -> filler.requestSubmit());
+            JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            bottomBar.add(submitButton);
+            frame.add(bottomBar, BorderLayout.SOUTH);
+
             frame.add(filler.getComponent(), BorderLayout.CENTER);
 
             // 5. Listen for events

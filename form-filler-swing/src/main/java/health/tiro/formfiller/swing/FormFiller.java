@@ -114,8 +114,12 @@ public class FormFiller implements AutoCloseable {
         // Create the browser component
         this.component = browser.createComponent();
 
-        // Load the target URL
-        browser.loadUrl(config.getTargetUrl());
+        // Load the target URL (use default page if no custom URL is configured)
+        String url = config.getTargetUrl();
+        if (url == null || url.trim().isEmpty()) {
+            url = DefaultPageLoader.createPage(config.getSdcEndpointAddress(), config.getDataEndpointAddress(), config.getSdkUrl());
+        }
+        browser.loadUrl(url);
     }
 
     // ========== Listener management ==========

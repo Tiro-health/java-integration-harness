@@ -84,10 +84,14 @@ EmbeddedBrowser browser = new JxBrowserAdapter(
 // 2. Create the FHIR handler (pick your version)
 SmartMessageHandler handler = new SmartMessageHandler();
 
-// 3. Create the viewer
+// 3. Create the viewer (uses the built-in default page)
 FormFillerConfig config = FormFillerConfig.builder()
-    .targetUrl("https://your-form-app.com/form-filler.html")
+    .sdcEndpointAddress("http://localhost:8000/fhir/r5")
     .build();
+// Or bring your own page:
+// FormFillerConfig config = FormFillerConfig.builder()
+//     .targetUrl("https://your-form-app.com/form-filler.html")
+//     .build();
 FormFiller viewer = new FormFiller(config, browser, handler);
 
 // 4. Listen for events
@@ -219,15 +223,6 @@ See the [`examples/`](examples/) directory for runnable demo applications:
 - **[Equo Chromium](examples/equo/src/main/java/health/tiro/examples/equo/Main.java)** — basic form filler with Equo Chromium (FHIR R5)
 
 **Running the examples:**
-
-First, serve the form filler page on `http://127.0.0.1:8001`:
-
-```bash
-cd examples/src/main/resources/form-filler
-python3 -m http.server 8001 --bind 127.0.0.1
-```
-
-Then in a separate terminal:
 
 ```bash
 # JxBrowser (requires a license key)

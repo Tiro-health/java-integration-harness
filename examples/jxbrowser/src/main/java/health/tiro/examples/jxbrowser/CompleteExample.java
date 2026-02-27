@@ -21,7 +21,11 @@ import java.util.Map;
 
 public class CompleteExample {
     private static final String SDC_SERVER = "http://localhost:8000/fhir/r5";
+    private static final String FHIR_SERVER = "http://fhir-server:5826/fhir/r5";
+    private static final String SDK_URL = "https://cdn.tiro.health/sdk-dev/v0.2.2-dev.4/tiro-web-sdk.iife.js";
+
     private static final String PATIENT_ID = "test-patient-001";
+
     private static final String[][] TEMPLATES = {
             {"Cardio template", "http://templates.tiro.health/templates/b62246c903cf4f01a20a68dd559e8c5c"},
             {"Interne geneeskunde template", "http://templates.tiro.health/templates/7e8ebd0ccfb44eb6a8616e28da7b1ae2"},
@@ -44,8 +48,11 @@ public class CompleteExample {
                     JxBrowserConfig.builder().licenseKey(System.getProperty("jxbrowser.license.key")).build()
             );
             SmartMessageHandler handler = new SmartMessageHandler();
+
             FormFillerConfig config = FormFillerConfig.builder()
-                    .targetUrl("http://127.0.0.1:8001")
+                    .sdcEndpointAddress(SDC_SERVER)
+                    .dataEndpointAddress(FHIR_SERVER)
+                    .sdkUrl(SDK_URL)
                     .build();
             FormFiller filler = new FormFiller(config, browser, handler);
 
@@ -96,7 +103,7 @@ public class CompleteExample {
                                         && ext.getValue() instanceof Attachment) {
                                     Attachment att = (Attachment) ext.getValue();
                                     if ("text/plain".equals(att.getContentType()) && att.getData() != null) {
-                                        plaintext = new String(java.util.Base64.getDecoder().decode(att.getData()), java.nio.charset.StandardCharsets.UTF_8);
+                                        plaintext = new String(att.getData(), java.nio.charset.StandardCharsets.UTF_8);
                                         break;
                                     }
                                 }
@@ -413,12 +420,17 @@ public class CompleteExample {
             }).start();
         });
 
+        // Submit button
+        JButton submitButton = new JButton("Submit");
+        submitButton.addActionListener(e -> filler.requestSubmit());
+
         selector.add(practitionerLabel);
         selector.add(practitionerCombo);
         selector.add(Box.createHorizontalStrut(12));
         selector.add(templateLabel);
         selector.add(templateCombo);
         selector.add(Box.createHorizontalStrut(12));
+        selector.add(submitButton);
         selector.add(extractButton);
         topBar.add(title, BorderLayout.WEST);
         topBar.add(selector, BorderLayout.EAST);

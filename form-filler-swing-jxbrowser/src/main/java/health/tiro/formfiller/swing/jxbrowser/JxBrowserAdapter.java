@@ -35,7 +35,7 @@ public class JxBrowserAdapter implements EmbeddedBrowser, AutoCloseable {
     private Browser browser;
     private JxBrowserBridge bridge;
     private Function<String, String> pendingIncomingMessageHandler;
-    private boolean ownsEngine = false;
+    private boolean ownsEngine;
 
     /**
      * Creates a new adapter with an internally managed {@link Engine}.
