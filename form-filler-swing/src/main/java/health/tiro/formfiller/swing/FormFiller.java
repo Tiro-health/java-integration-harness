@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  * frame.add(viewer.getComponent(), BorderLayout.CENTER);
  * }</pre>
  */
-public class FormFiller implements AutoCloseable {
+public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCloseable {
 
     private static final Logger logger = LoggerFactory.getLogger(FormFiller.class);
     private static final Pattern MESSAGE_TYPE_PATTERN = Pattern.compile(
@@ -44,7 +44,7 @@ public class FormFiller implements AutoCloseable {
     private final FormFillerConfig config;
     private final FormFillerTracer tracer;
     private final EmbeddedBrowser browser;
-    private final AbstractSmartMessageHandler handler;
+    private final H handler;
     private final Component component;
     private volatile CompletableFuture<Void> handshakeReceived = new CompletableFuture<>();
     private final ScheduledExecutorService timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -61,7 +61,7 @@ public class FormFiller implements AutoCloseable {
      * @param browser the embedded browser adapter
      * @param handler the SMART Web Messaging handler (R4 or R5)
      */
-    public FormFiller(FormFillerConfig config, EmbeddedBrowser browser, AbstractSmartMessageHandler handler) {
+    public FormFiller(FormFillerConfig config, EmbeddedBrowser browser, H handler) {
         this.config = config;
         this.browser = browser;
         this.handler = handler;
@@ -207,7 +207,7 @@ public class FormFiller implements AutoCloseable {
      * Get the underlying message handler for direct access to
      * {@code sendSdcDisplayQuestionnaireAsync(...)} and other methods.
      */
-    public AbstractSmartMessageHandler getMessageHandler() {
+    public H getMessageHandler() {
         return handler;
     }
 
