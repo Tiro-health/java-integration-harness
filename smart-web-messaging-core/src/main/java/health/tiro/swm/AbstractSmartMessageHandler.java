@@ -434,10 +434,23 @@ public abstract class AbstractSmartMessageHandler {
     // ========== Non-typed outbound convenience methods ==========
 
     public CompletableFuture<String> sendFormRequestSubmitAsync(Consumer<SmartMessageResponse> responseHandler) {
-        logger.debug("Sending ui.form.requestSubmit message.");
-        return sendMessageAsync("ui.form.requestSubmit", new RequestPayload(), responseHandler);
+        return sendFormRequestSubmitAsync(null, responseHandler);
     }
 
+    public CompletableFuture<String> sendFormRequestSubmitAsync(String intent, Consumer<SmartMessageResponse> responseHandler) {
+        logger.debug("Sending ui.form.requestSubmit message. intent={}", intent);
+        // null intent keeps the backward-compatible empty payload, so the form defaults
+        // to "finalize". Only carry a FormRequestSubmit when the host expresses an intent.
+        RequestPayload payload = intent == null ? new RequestPayload() : new FormRequestSubmit(intent);
+        return sendMessageAsync("ui.form.requestSubmit", payload, responseHandler);
+    }
+
+    /**
+     * @deprecated ui.form.persist is a no-op in every bridge. Use
+     * {@link #sendFormRequestSubmitAsync(String, Consumer)} with {@code intent = "save-draft"}
+     * to persist a draft through the form's submit pipeline.
+     */
+    @Deprecated
     public CompletableFuture<String> sendFormPersistAsync(Consumer<SmartMessageResponse> responseHandler) {
         logger.debug("Sending ui.form.persist message.");
         return sendMessageAsync("ui.form.persist", new RequestPayload(), responseHandler);

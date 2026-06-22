@@ -186,11 +186,22 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
     }
 
     /**
-     * Request form submission from the frontend.
+     * Request form submission from the frontend (finalize).
      */
     public void requestSubmit() {
-        logger.info("Requesting form submit");
-        handler.sendFormRequestSubmitAsync(null);
+        requestSubmit(null);
+    }
+
+    /**
+     * Request form submission from the frontend with an explicit intent.
+     *
+     * @param intent {@code "finalize"} (or {@code null}) finalizes the form;
+     *               {@code "save-draft"} persists an in-progress draft. The form
+     *               component remains the authority on the resulting status.
+     */
+    public void requestSubmit(String intent) {
+        logger.info("Requesting form submit (intent={})", intent);
+        handler.sendFormRequestSubmitAsync(intent, null);
     }
 
     /**
