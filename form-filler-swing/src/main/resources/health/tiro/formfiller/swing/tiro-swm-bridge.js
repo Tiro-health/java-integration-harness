@@ -139,7 +139,16 @@
 
       case "ui.form.requestSubmit":
         if (formFiller && formFiller.questionnaire) {
-          formFiller.submit();
+          // Map the host intent ("finalize" | "save-draft") to the form-filler's
+          // target status. The form still owns the completed -> amended promotion
+          // (via originate provenance) and the required-field validation skip for
+          // in-progress drafts.
+          var intent = message.payload && message.payload.intent;
+          if (intent === "save-draft") {
+            formFiller.submit({ status: "in-progress" });
+          } else {
+            formFiller.submit();
+          }
         }
         break;
 
@@ -338,12 +347,7 @@
   // Init
   // ===========================================
 
-  var latestResponse = null;
-
   function wireFormFiller(formFiller) {
-    formFiller.addEventListener("tiro-update", function (event) {
-      latestResponse = event.detail.response;
-    });
     formFiller.addEventListener("tiro-submit", function (event) {
       submitForm(formFiller, event.detail.response);
     });
@@ -386,10 +390,11 @@
     init: init,
     saveProgress: function () {
       var formFiller = document.querySelector(FORM_FILLER_SELECTOR);
-      if (latestResponse && formFiller) {
-        var response = JSON.parse(JSON.stringify(latestResponse));
-        response.status = "in-progress";
-        submitForm(formFiller, response);
+      if (formFiller && formFiller.questionnaire) {
+        // Route through the form's real submit pipeline (required-field validation
+        // skip, provenance) instead of stamping response.status externally. The form
+        // emits tiro-submit with status "in-progress", which submitForm forwards.
+        formFiller.submit({ status: "in-progress" });
       }
     },
     validate: function () {

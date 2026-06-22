@@ -613,4 +613,37 @@ class SmartMessageHandlerTest {
         assertEquals("patient", launchContext.get(0).get("name").asText());
     }
 
+    // ========== sendFormRequestSubmitAsync tests ==========
+
+    @Test
+    void sendFormRequestSubmitAsync_defaultIntent_omitsIntentField() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        handler.sendFormRequestSubmitAsync(null);
+
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        assertEquals("ui.form.requestSubmit", messageNode.get("messageType").asText());
+        // Backward-compatible: no intent expressed -> empty payload, no "intent" field.
+        assertFalse(messageNode.get("payload").has("intent"));
+    }
+
+    @Test
+    void sendFormRequestSubmitAsync_saveDraftIntent() throws Exception {
+        AtomicReference<String> sentMessage = new AtomicReference<>();
+        handler.setMessageSender(msg -> {
+            sentMessage.set(msg);
+            return CompletableFuture.completedFuture("OK");
+        });
+
+        handler.sendFormRequestSubmitAsync("save-draft", null);
+
+        JsonNode messageNode = objectMapper.readTree(sentMessage.get());
+        assertEquals("ui.form.requestSubmit", messageNode.get("messageType").asText());
+        assertEquals("save-draft", messageNode.get("payload").get("intent").asText());
+    }
+
 }
