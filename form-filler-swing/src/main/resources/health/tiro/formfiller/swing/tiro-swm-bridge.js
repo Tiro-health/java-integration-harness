@@ -119,7 +119,14 @@
   }
 
   function handleHostMessage(message) {
-    var formFiller = document.querySelector(FORM_FILLER_SELECTOR);
+    // Typed so `tsc --checkJs` validates the bridge's calls into the element (submit,
+    // setAttribute, questionnaire) against @tiro-health/web-sdk. Intersected with
+    // HTMLElement because the published .d.ts imports its base class from `lit`, which
+    // a type-only consumer doesn't install.
+    var formFiller =
+      /** @type {import("@tiro-health/web-sdk").TiroFormFiller & HTMLElement} */ (
+        document.querySelector(FORM_FILLER_SELECTOR)
+      );
     var handled = true;
 
     switch (message.messageType) {
@@ -244,6 +251,7 @@
     return result;
   }
 
+  /** @param {import("@tiro-health/web-sdk").TiroFormFiller & HTMLElement} formFiller */
   function submitForm(formFiller, response) {
     if (!response.status) response.status = "completed";
     response = sanitizeNulls(response);
@@ -389,7 +397,10 @@
   window.SmartWebMessaging = {
     init: init,
     saveProgress: function () {
-      var formFiller = document.querySelector(FORM_FILLER_SELECTOR);
+      var formFiller =
+        /** @type {import("@tiro-health/web-sdk").TiroFormFiller & HTMLElement} */ (
+          document.querySelector(FORM_FILLER_SELECTOR)
+        );
       if (formFiller && formFiller.questionnaire) {
         // Route through the form's real submit pipeline (required-field validation
         // skip, provenance) instead of stamping response.status externally. The form
@@ -398,7 +409,10 @@
       }
     },
     validate: function () {
-      var formFiller = document.querySelector(FORM_FILLER_SELECTOR);
+      var formFiller =
+        /** @type {import("@tiro-health/web-sdk").TiroFormFiller & HTMLElement} */ (
+          document.querySelector(FORM_FILLER_SELECTOR)
+        );
       if (formFiller) {
         formFiller.submit();
       }

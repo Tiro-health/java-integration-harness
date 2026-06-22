@@ -214,6 +214,10 @@ Each adapter injects the bridge and initializes it with a transport-specific `se
 
 Java→JS messages are delivered via `window.swmReceiveMessage(json)`, which the bridge registers globally.
 
+### Frontend version compatibility
+
+The harness is version-agnostic about `tiro-web-sdk` (you set `sdkUrl`/`targetUrl`; the default is the floating `cdn.tiro.health/sdk/latest`). One floor to know: **save-draft** (`requestSubmit("save-draft")` / `SmartWebMessaging.saveProgress()`) requires **`tiro-web-sdk` >= 0.3.0** — it maps to the frontend's `submit({ status: "in-progress" })`, an option added in 0.3.0. On older versions the option is ignored and the form **finalizes** instead. Plain finalize (`requestSubmit()`) works on all versions. The `tests/bridge-contract/` type-check guards this contract against the live `tiro-web-sdk@latest`.
+
 ## Examples
 
 See the [`examples/`](examples/) directory for runnable demo applications:
