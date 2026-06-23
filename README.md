@@ -220,7 +220,7 @@ The harness is version-agnostic about `tiro-web-sdk` (you set `sdkUrl`/`targetUr
 
 **Pinning recommendation:** if you pin the integration harness (Maven artifact) to a fixed version, set `sdkUrl` to a matching pinned `tiro-web-sdk` version (`sdk/vX.Y.Z/`) rather than the floating `sdk/latest`. A pinned harness ships a fixed bridge that was validated against a specific frontend (each harness release records the version it validated against); tracking `latest` lets a future frontend release drift the bridge contract out from under your pinned bridge. Track `latest` only if you also track the latest harness.
 
-One floor to know: **save-draft** (`requestSubmit("save-draft")` / `SmartWebMessaging.saveProgress()`) requires **`tiro-web-sdk` >= 0.3.0** — it maps to the frontend's `submit({ status: "in-progress" })`, an option added in 0.3.0. On older versions the option is ignored and the form **finalizes** instead. Plain finalize (`requestSubmit()`) works on all versions. The `tests/bridge-contract/` type-check guards this contract against the live `tiro-web-sdk@latest`.
+One floor to know: **save-draft** (`requestSubmit("save-draft")` / `SmartWebMessaging.saveProgress()`) requires **`tiro-web-sdk` >= 0.3.0** — it maps to the frontend's `submit({ status: "in-progress" })`, an option added in 0.3.0. On older versions the option is ignored and the form **finalizes** instead. Plain finalize (`requestSubmit()`) works on all versions. The `build/bridge-contract/` type-check guards this contract against the live `tiro-web-sdk@latest`.
 
 ## Examples
 
