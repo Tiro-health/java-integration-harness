@@ -21,6 +21,11 @@ package health.tiro.formfiller.swing;
  */
 public class FormFillerConfig {
 
+    /**
+     * Default frontend bundle: the floating {@code latest} channel. Note: the save-draft
+     * intent ({@code requestSubmit("save-draft")}) requires {@code tiro-web-sdk >= 0.3.0} —
+     * on older versions the draft status is ignored and the form finalizes instead.
+     */
     static final String DEFAULT_SDK_URL =
         "https://cdn.tiro.health/sdk/latest/tiro-web-sdk.iife.js";
 
