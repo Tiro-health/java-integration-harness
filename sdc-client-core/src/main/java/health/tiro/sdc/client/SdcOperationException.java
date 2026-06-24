@@ -20,7 +20,11 @@ public class SdcOperationException extends RuntimeException {
     private final transient IBaseOperationOutcome outcome;
 
     public SdcOperationException(String operation, int statusCode, IBaseOperationOutcome outcome, String message) {
-        super(message);
+        this(operation, statusCode, outcome, message, null);
+    }
+
+    public SdcOperationException(String operation, int statusCode, IBaseOperationOutcome outcome, String message, Throwable cause) {
+        super(message, cause);
         this.operation = operation;
         this.statusCode = statusCode;
         this.outcome = outcome;

@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -46,6 +47,12 @@ public abstract class SdcClientBase<
         implements Closeable {
 
     private static final String FHIR_JSON = "application/fhir+json";
+
+    // Finite timeouts for the internally-owned client. Apache's HttpClients.createDefault() applies
+    // none (infinite), which would hang a caller — possibly a host UI thread — against a stalled
+    // server. Callers who inject their own client keep full control.
+    private static final int CONNECT_TIMEOUT_MS = 10_000;
+    private static final int SOCKET_TIMEOUT_MS = 60_000;
 
     private final String baseUrl;
     private final FhirContext fhirContext;
@@ -86,7 +93,12 @@ public abstract class SdcClientBase<
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
 
         if (httpClient == null) {
-            this.httpClient = HttpClients.createDefault();
+            RequestConfig requestConfig = RequestConfig.custom()
+                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                    .setConnectionRequestTimeout(CONNECT_TIMEOUT_MS)
+                    .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                    .build();
+            this.httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build();
             this.ownsClient = true;
         } else {
             this.httpClient = httpClient;
@@ -151,7 +163,7 @@ public abstract class SdcClientBase<
             } catch (RuntimeException ex) {
                 throw new SdcOperationException(relativePath, status, null,
                         "SDC operation '" + relativePath + "' returned a body that could not be parsed as FHIR: "
-                                + ex.getMessage());
+                                + ex.getMessage(), ex);
             }
 
             if (returnType.isInstance(parsed)) {
@@ -166,7 +178,7 @@ public abstract class SdcClientBase<
                             + "', expected '" + returnType.getSimpleName() + "'.");
         } catch (IOException ex) {
             throw new SdcOperationException(relativePath, 0, null,
-                    "SDC operation '" + relativePath + "' failed: " + ex.getMessage());
+                    "SDC operation '" + relativePath + "' failed: " + ex.getMessage(), ex);
         }
     }
 
