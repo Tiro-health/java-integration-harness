@@ -19,6 +19,8 @@ import org.apache.http.util.EntityUtils;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
@@ -45,6 +47,8 @@ public abstract class SdcClientBase<
         TOperationOutcome extends IBaseOperationOutcome,
         TBundle extends IBaseBundle>
         implements Closeable {
+
+    private static final Logger log = LoggerFactory.getLogger(SdcClientBase.class);
 
     private static final String FHIR_JSON = "application/fhir+json";
 
@@ -136,8 +140,10 @@ public abstract class SdcClientBase<
         request.setEntity(new StringEntity(json, ContentType.create(FHIR_JSON, StandardCharsets.UTF_8)));
         request.setHeader("Accept", FHIR_JSON);
 
+        log.debug("SDC POST {}", request.getURI());
         try (CloseableHttpResponse response = httpClient.execute(request)) {
             final int status = response.getStatusLine().getStatusCode();
+            log.debug("SDC {} -> {}", relativePath, status);
             final HttpEntity entity = response.getEntity();
             final String responseBody = entity == null ? "" : EntityUtils.toString(entity, StandardCharsets.UTF_8);
 
