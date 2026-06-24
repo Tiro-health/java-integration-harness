@@ -42,6 +42,8 @@
         <module>form-filler-swing</module>
         <module>form-filler-swing-jxbrowser</module>
         <module>form-filler-swing-equo</module>
+        <module>sdc-client-core</module>
+        <module>sdc-client-r5</module>
     </modules>
 
     <properties>
@@ -82,6 +84,17 @@
                 <version>${project.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>health.tiro</groupId>
+                <artifactId>sdc-client-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>health.tiro</groupId>
+                <artifactId>sdc-client-r5</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
             <!-- HAPI FHIR -->
             <dependency>
                 <groupId>ca.uhn.hapi.fhir</groupId>
@@ -105,6 +118,11 @@
             </dependency>
 
             <!-- Jackson -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
@@ -164,6 +182,13 @@
                 <groupId>com.equo</groupId>
                 <artifactId>com.equo.chromium</artifactId>
                 <version>${equo.chromium.version}</version>
+            </dependency>
+
+            <!-- HTTP client for the SDC client's bare-resource POSTs (Java 8 compatible) -->
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.14</version>
             </dependency>
 
             <!-- Testing -->
