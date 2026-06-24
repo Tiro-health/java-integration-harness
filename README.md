@@ -187,6 +187,27 @@ handler.sendSdcConfigureContextAsync(
 | Swing | `form-filler-swing` | `FormFiller` controller + `EmbeddedBrowser` interface. Depends on core. |
 | Swing JxBrowser | `form-filler-swing-jxbrowser` | JxBrowser adapter. Depends on swing + JxBrowser (provided). |
 | Swing Equo | `form-filler-swing-equo` | Equo Chromium adapter. Depends on swing + Equo Chromium (provided). |
+| SDC Client Core | `sdc-client-core` | FHIR-version-agnostic core for the stateless SDC server operations. Depends on `hapi-fhir-base` + Apache HttpClient. |
+| SDC Client R5 | `sdc-client-r5` | FHIR R5 binding: `SdcClient` for `$validate`/`$extract`. Depends on core + `hapi-fhir-structures-r5`. |
+
+## SDC Client
+
+`SdcClient` (module `sdc-client-r5`) is a thin, strongly-typed client over the **stateless SDC server** FHIR operations — call them directly instead of hand-building request bodies and parsing raw responses. Separate from the messaging/viewer modules (an HTTP/FHIR client, not the embedded-UI bridge).
+
+```java
+import health.tiro.sdc.client.r5.SdcClient;
+import org.hl7.fhir.r5.model.*;
+
+try (SdcClient sdc = new SdcClient("https://host/fhir/r5")) {   // optionally pass a CloseableHttpClient for TLS/proxy
+    OperationOutcome outcome = sdc.validate(questionnaireResponse);   // POST QuestionnaireResponse/$validate
+    Bundle extracted        = sdc.extract(questionnaireResponse);     // POST QuestionnaireResponse/$extract
+}
+```
+
+- **R5-only**: these SDC operations exist only on `/fhir/r5` (a future R4 server would be one new `sdc-client-r4` binding). **No auth** — the base URL is sufficient. Calls are **blocking** (HAPI/Apache HttpClient are synchronous).
+- A validation *failure* comes back as `OperationOutcome` issues; transport/server errors (non-2xx) throw `SdcOperationException` (carrying the status + any server outcome). Responses are parsed leniently, tolerating elements/codes a newer server emits.
+- **Use one SDC base for both**: `baseUrl` here and the viewer's `FormFillerConfig.sdcEndpointAddress` are the same concept — the SDC server. A host that embeds the form **and** calls the client should configure the address once and pass it to both. The client has no default base (you must pass one) to avoid silently diverging from a configured viewer.
+- `$extract` returns a transaction `Bundle`: the resources the answers produce (Tiro's template questionnaires yield a `Composition` with per-section narrative; definition-based ones yield structured resources), plus the source QR and a `Provenance`. `$populate` is tracked separately (#20).
 
 ## Message Types Supported
 
