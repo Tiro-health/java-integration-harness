@@ -1,5 +1,6 @@
 package health.tiro.formfiller.swing;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import health.tiro.formfiller.swing.tracing.FormFillerTracer;
 import health.tiro.formfiller.swing.tracing.FormFillerTracerFactory;
 import health.tiro.swm.AbstractSmartMessageHandler;
@@ -47,6 +48,7 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
     private final H handler;
     private final Component component;
     private volatile CompletableFuture<Void> handshakeReceived = new CompletableFuture<>();
+    private volatile String pageWebSdkVersion;
     private final ScheduledExecutorService timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "swm-handshake-timeout");
         t.setDaemon(true);
@@ -93,8 +95,10 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
             public void onHandshakeReceived(HandshakeReceivedEvent event) {
                 logger.info("Handshake received from web page");
                 tracer.traceHandshakeReceived();
-                handshakeReceived.complete(null);
-                fireHandshakeReceived();
+                if (acceptWebSdkReport(event.getPayload())) {
+                    handshakeReceived.complete(null);
+                    fireHandshakeReceived();
+                }
             }
 
             @Override
@@ -130,6 +134,81 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
 
     public void removeFormFillerListener(FormFillerListener listener) {
         listeners.remove(listener);
+    }
+
+    // ========== Embedded web-sdk check (GH-24) ==========
+
+    /**
+     * Decides whether the page may proceed, from the {@code client} report the bridge puts in
+     * the handshake payload. Returns false — and refuses the session — when the page is not
+     * running the bundle this harness embeds.
+     *
+     * <p>The decision is made on {@code source}, not on the version. {@code source} is the
+     * bridge's own account of what it did (inject ours, stand aside for the page's own copy,
+     * or fail), which needs no cooperation from the SDK; the version is the element's
+     * self-report, which a foreign or tampered bundle can set to anything. Comparing versions
+     * would only add a way to refuse a <em>working</em> session — if a future SDK dropped its
+     * static version field, say — so a mismatch is logged and nothing more. It is real
+     * information: with {@code source: "collision"} it names the version the page substituted.
+     */
+    private boolean acceptWebSdkReport(JsonNode payload) {
+        JsonNode client = payload == null ? null : payload.get("client");
+        String source = textOrNull(client, "source");
+        String version = textOrNull(client, "version");
+        this.pageWebSdkVersion = version;
+        tracer.traceWebSdkReported(version, source);
+
+        if ("collision".equals(source) || "error".equals(source)) {
+            WebSdkLoadException failure = new WebSdkLoadException(source);
+            logger.error("Refusing the form-filler session: {} (page reported tiro-web-sdk {}, embedded is {})",
+                    failure.getMessage(), version == null ? "no version" : version, WebSdkAssets.getVersion());
+            handshakeReceived.completeExceptionally(failure);
+            fireWebSdkLoadFailed(failure);
+            return false;
+        }
+
+        if (source == null) {
+            // Not our bridge's handshake — an older bridge, or a page doing its own SMART Web
+            // Messaging. There is no evidence of a bad pairing here, only an absence of
+            // evidence, so this reports rather than refuses.
+            logger.warn("The page's handshake carried no tiro-web-sdk report, so the harness cannot "
+                    + "confirm it is running the embedded bundle ({}).", WebSdkAssets.getVersion());
+        } else if (version != null && !version.equals(WebSdkAssets.getVersion())) {
+            logger.warn("The page reports tiro-web-sdk {} but this harness embeds {}. The bridge injected "
+                    + "the embedded bundle, so this is a self-report worth investigating rather than a "
+                    + "refused session.", version, WebSdkAssets.getVersion());
+        } else {
+            logger.info("Page is running the embedded tiro-web-sdk {}", WebSdkAssets.getVersion());
+        }
+        return true;
+    }
+
+    private static String textOrNull(JsonNode node, String field) {
+        if (node == null) return null;
+        JsonNode value = node.get(field);
+        return value == null || value.isNull() ? null : value.asText();
+    }
+
+    /**
+     * The {@code tiro-web-sdk} version the page reported at handshake, or {@code null} if it
+     * reported none (or the handshake has not happened yet). Diagnostics: what the harness
+     * embeds is {@link WebSdkAssets#getVersion()}, and the two agreeing is not what makes a
+     * session safe — see {@link #acceptWebSdkReport}.
+     */
+    public String getPageWebSdkVersion() {
+        return pageWebSdkVersion;
+    }
+
+    private void fireWebSdkLoadFailed(WebSdkLoadException error) {
+        SwingUtilities.invokeLater(() -> {
+            for (FormFillerListener listener : listeners) {
+                try {
+                    listener.onWebSdkLoadFailed(error);
+                } catch (Exception e) {
+                    logger.error("Error in listener onWebSdkLoadFailed", e);
+                }
+            }
+        });
     }
 
     private void fireHandshakeReceived() {
@@ -210,6 +289,7 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
      */
     public void navigate(String url) {
         handshakeReceived = new CompletableFuture<>();
+        pageWebSdkVersion = null;
         handler.clearAllResponseListeners();
         browser.loadUrl(url);
     }

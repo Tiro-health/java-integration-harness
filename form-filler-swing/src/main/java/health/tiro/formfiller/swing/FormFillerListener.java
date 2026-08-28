@@ -37,4 +37,15 @@ public interface FormFillerListener {
      * Called when the browser app requests to close (ui.done message).
      */
     default void onCloseRequested() {}
+
+    /**
+     * Called when the page is not running the harness's embedded {@code tiro-web-sdk} — it
+     * loaded its own copy, or the embedded bundle failed to load. The session is refused:
+     * {@link FormFiller#waitForHandshake()} fails with the same exception, and
+     * {@link #onHandshakeReceived()} is not called.
+     *
+     * <p>Override to surface it in your UI; a host that awaits the handshake already sees it
+     * there and needs nothing here.
+     */
+    default void onWebSdkLoadFailed(WebSdkLoadException error) {}
 }

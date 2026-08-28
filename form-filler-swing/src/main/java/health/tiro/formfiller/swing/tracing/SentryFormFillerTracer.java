@@ -1,5 +1,6 @@
 package health.tiro.formfiller.swing.tracing;
 
+import health.tiro.formfiller.swing.WebSdkAssets;
 import io.sentry.Breadcrumb;
 import io.sentry.ISpan;
 import io.sentry.ITransaction;
@@ -106,6 +107,28 @@ final class SentryFormFillerTracer implements FormFillerTracer {
         bc.setCategory("formfiller.handshake");
         bc.setLevel(SentryLevel.INFO);
         Sentry.addBreadcrumb(bc);
+    }
+
+    @Override
+    public void traceWebSdkReported(String version, String source) {
+        // A breadcrumb, not a span: this is a fact about the session, and it has no duration.
+        // Level rides on `source` so a refused session is visible without reading the data.
+        if (!Sentry.isEnabled()) return;
+
+        boolean ok = "embedded".equals(source);
+        Breadcrumb bc = new Breadcrumb("tiro-web-sdk " + (version == null ? "(no version reported)" : version));
+        bc.setCategory("formfiller.websdk");
+        bc.setLevel(ok ? SentryLevel.INFO : SentryLevel.ERROR);
+        bc.setData("web_sdk_version", String.valueOf(version));
+        bc.setData("web_sdk_source", String.valueOf(source));
+        bc.setData("web_sdk_embedded_version", WebSdkAssets.getVersion());
+        Sentry.addBreadcrumb(bc);
+
+        ITransaction tx = this.transaction;
+        if (tx != null) {
+            tx.setTag("web_sdk_version", String.valueOf(version));
+            tx.setTag("web_sdk_source", String.valueOf(source));
+        }
     }
 
     @Override

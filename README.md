@@ -243,7 +243,23 @@ Java→JS messages are delivered via `window.swmReceiveMessage(json)`, which the
 - The bridge is type-checked against that exact version on every PR and again at release ([`build/bridge-contract/`](build/bridge-contract/README.md)).
 - `save-draft` (`requestSubmit("save-draft")`) maps to the element's `submit({ status: "in-progress" })`, added in web-sdk 0.3.0. The embedded bundle is well past that, so the option works — this is no longer a floor you have to check.
 
-**Your page must not load `tiro-web-sdk` itself.** With a custom `targetUrl`, delete the `<script src="…tiro-web-sdk…">` tag; the page is markup and branding only. The bridge reports what actually loaded in the handshake, and the harness refuses the session with a `WebSdkLoadException` if the page ran its own copy (`collision`) or the embedded bundle could not load (`error`).
+**Your page must not load `tiro-web-sdk` itself.** With a custom `targetUrl`, delete the `<script src="…tiro-web-sdk…">` tag; the page is markup and branding only.
+
+The bridge reports what actually loaded in the handshake, and the harness **refuses the session** when the page ran its own copy (`collision`) or the embedded bundle could not load (`error`):
+
+```java
+viewer.addFormFillerListener(new FormFillerListener() {
+    @Override
+    public void onWebSdkLoadFailed(WebSdkLoadException e) {
+        // e.getReason() is "collision" or "error"; e.getMessage() says what to fix
+    }
+});
+
+// or, equivalently, on the handshake you were already awaiting:
+viewer.waitForHandshake().get();   // throws WebSdkLoadException
+```
+
+Queued outbound messages fail with the same exception rather than waiting on a handshake that will never complete. `viewer.getPageWebSdkVersion()` returns the version the element reported — diagnostics only: the refusal is decided on *what the bridge did*, not on a version the page tells us about itself.
 
 One consequence worth knowing: a `file://` script only loads into a `file://` document, so a `targetUrl` served over **http(s) cannot run the embedded bundle** and is refused. Use the generated page (`sdcEndpointAddress`) or ship your page as a local file.
 

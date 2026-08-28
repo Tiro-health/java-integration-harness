@@ -4,6 +4,7 @@ import com.teamdev.jxbrowser.engine.RenderingMode;
 import health.tiro.formfiller.swing.EmbeddedBrowser;
 import health.tiro.formfiller.swing.FormFiller;
 import health.tiro.formfiller.swing.FormFillerConfig;
+import health.tiro.formfiller.swing.WebSdkAssets;
 import health.tiro.swm.r4.SmartMessageHandler;
 import org.junit.jupiter.api.Test;
 
@@ -11,10 +12,17 @@ import java.net.URL;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class JxBrowserIntegrationTest {
 
+    /**
+     * The whole GH-24 chain in a real browser: the bridge injects the embedded bundle from the
+     * file:// URL the preamble gave it, the element registers, and the handshake reports that
+     * element's build-time version. The page is empty and carries no SDK reference of its own,
+     * which is the point — a handshake here proves the harness supplied the SDK.
+     */
     @Test
     void handshakeCompletesWithInjectedBridge() throws Exception {
         String licenseKey = System.getProperty("jxbrowser.license.key");
@@ -38,6 +46,8 @@ class JxBrowserIntegrationTest {
 
         try {
             filler.waitForHandshake().get(15, TimeUnit.SECONDS);
+            assertEquals(WebSdkAssets.getVersion(), filler.getPageWebSdkVersion(),
+                    "the page should be running the bundle the harness embedded and served");
         } finally {
             filler.close();
         }
