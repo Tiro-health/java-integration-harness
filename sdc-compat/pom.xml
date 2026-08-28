@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>health.tiro</groupId>
+        <artifactId>smart-web-messaging-parent</artifactId>
+        <version>2.0.0</version>
+    </parent>
+
+    <artifactId>sdc-compat</artifactId>
+    <packaging>jar</packaging>
+
+    <name>SDC Compatibility</name>
+    <description>The SDC-server compatibility contract this harness release ships: the minimum server version it supports, and the probe that reads a live server's version. Shared by the SDC client and the form filler; depends on Jackson only.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

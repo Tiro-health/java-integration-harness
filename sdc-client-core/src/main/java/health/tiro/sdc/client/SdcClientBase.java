@@ -1,15 +1,19 @@
 package health.tiro.sdc.client;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
@@ -21,6 +25,11 @@ import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import health.tiro.sdc.compat.SdcHttpResponse;
+import health.tiro.sdc.compat.SdcServerVersionProbe;
+import health.tiro.sdc.compat.SdcVersionCheckOutcome;
+import health.tiro.sdc.compat.SdcVersionCheckResult;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
@@ -64,6 +73,11 @@ public abstract class SdcClientBase<
     private final Class<TBundle> bundleType;
     private final CloseableHttpClient httpClient;
     private final boolean ownsClient;
+
+    // The one-time SDC server version check (GH-24). Started by the first operation, never in
+    // the constructor: constructing a client must not reach the network.
+    private final AtomicBoolean versionCheckStarted = new AtomicBoolean();
+    private volatile SdcVersionCheckResult versionCheck;
 
     /**
      * @param baseUrl the SDC server FHIR base, e.g. {@code https://host/fhir/r5}. Must be a plain
@@ -111,6 +125,80 @@ public abstract class SdcClientBase<
     }
 
     /**
+     * The outcome of this client's SDC server version check, or {@code null} until the first
+     * operation has run it. Exposed because the check's telemetry lands in the
+     * <em>customer's</em> logs, not Tiro's — they self-host the server.
+     */
+    public SdcVersionCheckResult getServerVersionCheck() {
+        return versionCheck;
+    }
+
+    /**
+     * Runs the SDC server version check once per client instance, before the first operation.
+     *
+     * <p>Reports; never refuses. A server below the floor is an actionable warning ("upgrade
+     * the SDC server"), an unreadable version a diagnostic, and both let the operation
+     * proceed — see {@link health.tiro.sdc.compat.SdcCompatibility#minimumSdcVersion()} for why
+     * enforcement is not shipped yet and what to add when the floor is first raised for a real
+     * reason.
+     *
+     * <p>Only the first caller waits for it, and only for the probe's own 3s deadline; a
+     * concurrent second caller proceeds immediately rather than queueing behind an advisory
+     * check. The probe rides this client's {@link CloseableHttpClient}, so it travels the same
+     * TLS, proxy and timeout path as the operations it guards.
+     */
+    private void ensureServerVersionChecked() {
+        if (versionCheck != null || !versionCheckStarted.compareAndSet(false, true)) return;
+
+        SdcVersionCheckResult result = SdcServerVersionProbe.check(URI.create(baseUrl), this::fetch);
+        versionCheck = result;
+
+        if (result.getOutcome() == SdcVersionCheckOutcome.SATISFIED) {
+            log.debug("{}", result);
+        } else {
+            // Both remaining outcomes are logged at WARN, and they read differently on purpose:
+            // TOO_OLD is actionable — upgrade the server — while UNKNOWN is a diagnostic about
+            // the check itself. Collapsing them would turn the actionable one into noise.
+            log.warn("{}", result);
+        }
+    }
+
+    // The probe's transport, over this client. Deliberately not a second HttpClient: a
+    // deployment that needs a proxy or a client certificate to reach the SDC server needs it
+    // for the version check too, and a probe that fails for a reason the operations don't
+    // share is a diagnostic about nothing.
+    private SdcHttpResponse fetch(URI uri, String accept, int timeoutMillis, int maxBytes) throws IOException {
+        HttpGet request = new HttpGet(uri);
+        request.setHeader("Accept", accept);
+        // Overrides whatever the injected client defaults to: the probe's deadline is short
+        // because a startup check must not become the reason a form takes long to appear.
+        request.setConfig(RequestConfig.custom()
+                .setConnectTimeout(timeoutMillis)
+                .setConnectionRequestTimeout(timeoutMillis)
+                .setSocketTimeout(timeoutMillis)
+                .build());
+
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            int status = response.getStatusLine().getStatusCode();
+            HttpEntity entity = response.getEntity();
+            if (entity == null) return new SdcHttpResponse(status, new byte[0], false);
+
+            try (InputStream stream = entity.getContent()) {
+                ByteArrayOutputStream buffered = new ByteArrayOutputStream();
+                byte[] chunk = new byte[8192];
+                int read;
+                while ((read = stream.read(chunk)) > 0) {
+                    if (buffered.size() + read > maxBytes) {
+                        return new SdcHttpResponse(status, buffered.toByteArray(), true);
+                    }
+                    buffered.write(chunk, 0, read);
+                }
+                return new SdcHttpResponse(status, buffered.toByteArray(), false);
+            }
+        }
+    }
+
+    /**
      * Validate a QuestionnaireResponse against its referenced Questionnaire
      * ({@code POST QuestionnaireResponse/$validate}). A validation failure is reported as issues in
      * the returned outcome, not as an exception.
@@ -129,6 +217,8 @@ public abstract class SdcClientBase<
 
     private <T extends IBaseResource> T post(String relativePath, IBaseResource body, Class<T> returnType) {
         if (body == null) throw new IllegalArgumentException("resource body is required");
+
+        ensureServerVersionChecked();
 
         // Build a parser per call — FhirContext is thread-safe and parser creation is cheap, parsers aren't.
         // Lenient on the parser instance (not the shared context) so a newer server's unrecognized

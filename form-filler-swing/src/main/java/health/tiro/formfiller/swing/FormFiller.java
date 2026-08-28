@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import health.tiro.formfiller.swing.tracing.FormFillerTracer;
 import health.tiro.formfiller.swing.tracing.FormFillerTracerFactory;
 import health.tiro.swm.AbstractSmartMessageHandler;
+import health.tiro.sdc.compat.SdcServerVersionProbe;
+import health.tiro.sdc.compat.SdcVersionCheckOutcome;
+import health.tiro.sdc.compat.SdcVersionCheckResult;
 import health.tiro.swm.events.*;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.slf4j.Logger;
@@ -11,6 +14,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.swing.SwingUtilities;
 import java.awt.Component;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.regex.Matcher;
@@ -49,6 +54,7 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
     private final Component component;
     private volatile CompletableFuture<Void> handshakeReceived = new CompletableFuture<>();
     private volatile String pageWebSdkVersion;
+    private volatile SdcVersionCheckResult sdcServerVersionCheck;
     private final ScheduledExecutorService timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "swm-handshake-timeout");
         t.setDaemon(true);
@@ -124,6 +130,8 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
             url = DefaultPageLoader.createPage(config.getSdcEndpointAddress(), config.getDataEndpointAddress());
         }
         browser.loadUrl(url);
+
+        startSdcServerVersionCheck();
     }
 
     // ========== Listener management ==========
@@ -134,6 +142,82 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
 
     public void removeFormFillerListener(FormFillerListener listener) {
         listeners.remove(listener);
+    }
+
+    // ========== SDC server version check (GH-24) ==========
+
+    /**
+     * The outcome of this viewer's SDC server version check, or {@code null} until it has
+     * answered (and when no {@code sdcEndpointAddress} is configured, in which case there is
+     * nothing to check). Exposed because the check's telemetry lands in the <em>customer's</em>
+     * logs, not Tiro's — they self-host the SDC server.
+     */
+    public SdcVersionCheckResult getSdcServerVersionCheck() {
+        return sdcServerVersionCheck;
+    }
+
+    /**
+     * Reads the configured SDC server's version. Overridable so a host can route the probe
+     * through its own transport — or a test can supply a verdict without network I/O; the
+     * production behaviour is {@link SdcServerVersionProbe#check(URI)}, which is
+     * unauthenticated. That costs nothing today: the SDC server holds its own service-account
+     * credentials and requires none from the caller. Should that change, a 401 reads as an
+     * unknown version and fails open — the check is disarmed, not the launch broken.
+     */
+    protected SdcVersionCheckResult checkSdcServerVersion(URI sdcBaseAddress) {
+        return SdcServerVersionProbe.check(sdcBaseAddress);
+    }
+
+    /**
+     * Probes the SDC server off the constructing thread and reports the verdict.
+     *
+     * <p>Nothing here refuses a launch, and nothing waits for it: the page is already loading,
+     * and a version check must never be the reason a form is slow to appear or fails to. See
+     * {@link health.tiro.sdc.compat.SdcCompatibility#minimumSdcVersion()} for why enforcement
+     * is not shipped yet and what to add when the floor is first raised for a real reason.
+     */
+    private void startSdcServerVersionCheck() {
+        String address = config.getSdcEndpointAddress();
+        if (address == null || address.trim().isEmpty()) return;
+
+        final URI sdcBase;
+        try {
+            URI parsed = new URI(address.trim());
+            if (!parsed.isAbsolute()) throw new URISyntaxException(address, "not absolute");
+            sdcBase = parsed;
+        } catch (URISyntaxException e) {
+            // Not this check's business to reject the address — the page will fail on it soon
+            // enough, with a better message.
+            logger.debug("sdcEndpointAddress is not an absolute URI; server version check skipped");
+            return;
+        }
+
+        Thread probe = new Thread(() -> {
+            SdcVersionCheckResult result;
+            try {
+                result = checkSdcServerVersion(sdcBase);
+            } catch (RuntimeException e) {
+                // SdcServerVersionProbe's contract is that a server-side or transport problem is
+                // a result, not an exception — so reaching here means the check itself broke, or
+                // an override did. Fail open: this exists to catch a bad pairing, not to add a
+                // new way for a form launch to die.
+                result = SdcVersionCheckResult.unavailable(
+                        "The SDC server version check itself failed: " + e);
+            }
+            sdcServerVersionCheck = result;
+            tracer.traceSdcServerVersion(result.getOutcome().name(), result.toString());
+
+            if (result.getOutcome() == SdcVersionCheckOutcome.SATISFIED) {
+                logger.debug("{}", result);
+            } else {
+                // TOO_OLD is actionable — upgrade the server — while UNKNOWN is a diagnostic
+                // about the check itself. Both are logged; collapsing them into one line would
+                // turn the actionable one into noise.
+                logger.warn("{}", result);
+            }
+        }, "sdc-version-check");
+        probe.setDaemon(true);
+        probe.start();
     }
 
     // ========== Embedded web-sdk check (GH-24) ==========

@@ -2,6 +2,7 @@ package health.tiro.sdc.client.r5;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,6 +12,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r5.model.Bundle;
@@ -27,6 +30,8 @@ import com.sun.net.httpserver.HttpServer;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.LenientErrorHandler;
 import health.tiro.sdc.client.SdcOperationException;
+import health.tiro.sdc.compat.SdcCompatibility;
+import health.tiro.sdc.compat.SdcVersionCheckOutcome;
 
 class SdcClientTest {
 
@@ -122,6 +127,60 @@ class SdcClientTest {
         assertEquals(OperationOutcome.IssueSeverity.INFORMATION, outcome.getIssueFirstRep().getSeverity());
     }
 
+    // ---- SDC server version check (GH-24) ----
+
+    @Test
+    void versionCheck_readsTheServerVersionOnce_andExposesIt() {
+        handler.respondToMetadata(200, capabilityStatement("Tiro.health SDC Server", "v0.9.39"));
+        handler.respond(200, "{\"resourceType\":\"Bundle\",\"type\":\"transaction\"}");
+
+        client.extract(sampleResponse());
+        client.extract(sampleResponse());
+
+        assertEquals(SdcVersionCheckOutcome.SATISFIED, client.getServerVersionCheck().getOutcome());
+        assertEquals("v0.9.39", client.getServerVersionCheck().getReportedVersion());
+        assertEquals(SdcCompatibility.minimumSdcVersion(), client.getServerVersionCheck().getMinimumVersion());
+        // Once per client, not per operation: this is a startup check, not a preflight.
+        assertEquals(1, handler.metadataRequests());
+    }
+
+    @Test
+    void versionCheck_reportsATooOldServer_butStillRunsTheOperation() {
+        handler.respondToMetadata(200, capabilityStatement("Tiro.health SDC Server", "v0.9.38"));
+        handler.respond(200, "{\"resourceType\":\"Bundle\",\"type\":\"transaction\"}");
+
+        // Reports; never refuses. The operation must still happen.
+        assertNotNull(client.extract(sampleResponse()));
+        assertEquals(SdcVersionCheckOutcome.TOO_OLD, client.getServerVersionCheck().getOutcome());
+    }
+
+    /**
+     * A server that cannot answer the probe — one predating the route, or behind something that
+     * 404s it — must not become a client that cannot do its job.
+     */
+    @Test
+    void versionCheck_failsOpen_whenTheServerCannotAnswer() {
+        handler.respondToMetadata(404, "");
+        handler.respond(200, "{\"resourceType\":\"Bundle\",\"type\":\"transaction\"}");
+
+        assertNotNull(client.extract(sampleResponse()));
+        assertEquals(SdcVersionCheckOutcome.UNKNOWN, client.getServerVersionCheck().getOutcome());
+        assertTrue(client.getServerVersionCheck().getDetail().contains("404"),
+                client.getServerVersionCheck().getDetail());
+    }
+
+    @Test
+    void versionCheck_isNotRunUntilTheFirstOperation() {
+        // Constructing a client must not reach the network.
+        assertNull(client.getServerVersionCheck());
+        assertEquals(0, handler.metadataRequests());
+    }
+
+    private static String capabilityStatement(String softwareName, String version) {
+        return "{\"resourceType\":\"CapabilityStatement\",\"status\":\"active\",\"software\":{"
+                + "\"name\":\"" + softwareName + "\",\"version\":\"" + version + "\"}}";
+    }
+
     @Test
     void constructor_rejectsBaseUrlWithQuery() {
         assertThrows(IllegalArgumentException.class,
@@ -132,6 +191,11 @@ class SdcClientTest {
     private static final class RecordingHandler implements HttpHandler {
         private int responseStatus = 200;
         private String responseBody = "";
+        // The version probe's GET {base}/metadata is answered separately, so an operation test
+        // never has to care that it happens and a probe test never has to fake an operation.
+        private int metadataStatus = 404;
+        private String metadataBody = "";
+        private final List<String> metadataPaths = new CopyOnWriteArrayList<>();
         String method;
         String path;
         String contentType;
@@ -142,10 +206,31 @@ class SdcClientTest {
             this.responseBody = fhirJson;
         }
 
+        void respondToMetadata(int status, String fhirJson) {
+            this.metadataStatus = status;
+            this.metadataBody = fhirJson;
+        }
+
+        int metadataRequests() {
+            return metadataPaths.size();
+        }
+
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            String requestPath = exchange.getRequestURI().toString();
+            if (requestPath.endsWith("/metadata")) {
+                metadataPaths.add(requestPath);
+                byte[] metadata = metadataBody.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/fhir+json");
+                exchange.sendResponseHeaders(metadataStatus, metadata.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(metadata);
+                }
+                return;
+            }
+
             method = exchange.getRequestMethod();
-            path = exchange.getRequestURI().toString();
+            path = requestPath;
             contentType = exchange.getRequestHeaders().getFirst("Content-Type");
             requestBody = readAll(exchange.getRequestBody());
 

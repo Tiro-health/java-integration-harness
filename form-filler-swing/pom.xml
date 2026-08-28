@@ -21,6 +21,10 @@
             <artifactId>smart-web-messaging-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>health.tiro</groupId>
+            <artifactId>sdc-compat</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>

@@ -35,6 +35,14 @@ public interface FormFillerTracer {
      */
     default void traceWebSdkReported(String version, String source) {}
 
+    /**
+     * Record the SDC server version check's verdict (GH-24).
+     *
+     * @param outcome {@code SATISFIED}, {@code TOO_OLD} or {@code UNKNOWN}
+     * @param summary the one-line verdict, naming both versions
+     */
+    default void traceSdcServerVersion(String outcome, String summary) {}
+
     /** Record form submission received from the browser. */
     void traceFormSubmitted();
 

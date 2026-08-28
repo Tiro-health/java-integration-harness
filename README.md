@@ -187,6 +187,7 @@ handler.sendSdcConfigureContextAsync(
 | Swing | `form-filler-swing` | `FormFiller` controller + `EmbeddedBrowser` interface. Depends on core. |
 | Swing JxBrowser | `form-filler-swing-jxbrowser` | JxBrowser adapter. Depends on swing + JxBrowser (provided). |
 | Swing Equo | `form-filler-swing-equo` | Equo Chromium adapter. Depends on swing + Equo Chromium (provided). |
+| SDC Compatibility | `sdc-compat` | The minimum SDC server version this release supports, and the probe that reads a live server. Jackson only — no HAPI, no HTTP client. |
 | SDC Client Core | `sdc-client-core` | FHIR-version-agnostic core for the stateless SDC server operations. Depends on `hapi-fhir-base` + Apache HttpClient. |
 | SDC Client R5 | `sdc-client-r5` | FHIR R5 binding: `SdcClient` for `$validate`/`$extract`. Depends on core + `hapi-fhir-structures-r5`. |
 
@@ -208,6 +209,23 @@ try (SdcClient sdc = new SdcClient("https://host/fhir/r5")) {   // optionally pa
 - A validation *failure* comes back as `OperationOutcome` issues; transport/server errors (non-2xx) throw `SdcOperationException` (carrying the status + any server outcome). Responses are parsed leniently, tolerating elements/codes a newer server emits.
 - **Use one SDC base for both**: `baseUrl` here and the viewer's `FormFillerConfig.sdcEndpointAddress` are the same concept — the SDC server. A host that embeds the form **and** calls the client should configure the address once and pass it to both. The client has no default base (you must pass one) to avoid silently diverging from a configured viewer.
 - `$extract` returns a transaction `Bundle`: the resources the answers produce (Tiro's template questionnaires yield a `Composition` with per-section narrative; definition-based ones yield structured resources), plus the source QR and a `Provenance`. `$populate` is tracked separately (#20).
+
+## SDC server version
+
+The harness embeds its frontend (see [The embedded frontend](#the-embedded-frontend)), so the **SDC server is the only component that can change underneath a pinned release** — you run and upgrade your own. It gets the one runtime version check.
+
+> **Integrator story:** pin the harness artifact; run an SDC server at or above the minimum in its release notes. Your page is branding only.
+
+`SdcCompatibility.minimumSdcVersion()` (module `sdc-compat`) is the floor this release ships. Both entry points check it once, against `GET {sdcEndpointAddress}/metadata` → `CapabilityStatement.software.version`:
+
+| Where | When | Exposed as |
+|---|---|---|
+| `FormFiller` | on construction, on a background thread | `getSdcServerVersionCheck()` |
+| `SdcClient` | before the first operation, over the same HTTP client | `getServerVersionCheck()` |
+
+**It reports; it does not refuse.** A server below the floor is logged as an actionable warning (and captured to Sentry when Sentry is configured); an unreadable version is logged as a diagnostic. Neither stops a form from launching or an operation from running. Two reasons: enforcement and the floor ship in the same artifact, so a deployment that hasn't adopted a raised floor hasn't adopted its enforcement either; and the current floor is the first server version that answers the probe at all, so a refusal could only ever fire on a mistake. The refusal arms in the release that first raises the floor for a real reason — the javadoc on `minimumSdcVersion()` says what to add.
+
+The version is only used when the document identifies itself as the SDC server (`software.name`). That matters: on a server predating the metadata route, `{base}/metadata` falls into the data tunnel and the *hospital's own* FHIR server answers with a perfectly parseable version that says nothing about the SDC server. Anything unattributable, unreachable, or outside the version grammar (`dev`, a PR checkpoint id) reads as **unknown** and is let through — never as "too old".
 
 ## Message Types Supported
 

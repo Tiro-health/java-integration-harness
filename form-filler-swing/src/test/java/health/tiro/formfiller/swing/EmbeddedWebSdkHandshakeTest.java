@@ -108,7 +108,14 @@ class EmbeddedWebSdkHandshakeTest {
                     .sdcEndpointAddress("http://localhost:8000/fhir/r5")
                     .handshakeTimeoutSeconds(2)
                     .build();
-            filler = new FormFiller<>(config, new FakeBrowser(), new SmartMessageHandler());
+            // Overridden so these tests never reach the network: the SDC version check is
+            // wired in FormFiller's constructor and is not what they are about.
+            filler = new FormFiller<SmartMessageHandler>(config, new FakeBrowser(), new SmartMessageHandler()) {
+                @Override
+                protected health.tiro.sdc.compat.SdcVersionCheckResult checkSdcServerVersion(java.net.URI base) {
+                    return health.tiro.sdc.compat.SdcVersionCheckResult.unavailable("not probed in this test");
+                }
+            };
         }
 
         void handshake(String clientFields) {

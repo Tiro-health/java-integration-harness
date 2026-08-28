@@ -132,6 +132,27 @@ final class SentryFormFillerTracer implements FormFillerTracer {
     }
 
     @Override
+    public void traceSdcServerVersion(String outcome, String summary) {
+        // A breadcrumb only travels if some LATER event in the session is captured, and on a
+        // deployment where the only thing wrong is an out-of-date SDC server nothing ever is —
+        // so a non-satisfied verdict is also captured as a message in its own right. That is
+        // the channel that actually reaches the customer's own Sentry project.
+        if (!Sentry.isEnabled()) return;
+
+        boolean ok = "SATISFIED".equals(outcome);
+        Breadcrumb bc = new Breadcrumb(summary);
+        bc.setCategory("formfiller.sdc.version");
+        bc.setLevel(ok ? SentryLevel.INFO : SentryLevel.WARNING);
+        bc.setData("outcome", outcome);
+        Sentry.addBreadcrumb(bc);
+
+        ITransaction tx = this.transaction;
+        if (tx != null) tx.setTag("sdc_version_check", outcome);
+
+        if (!ok) Sentry.captureMessage("SDC server version check: " + summary, SentryLevel.WARNING);
+    }
+
+    @Override
     public void traceFormSubmitted() {
         ITransaction tx = this.transaction;
         if (tx == null) return;
