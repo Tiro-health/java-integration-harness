@@ -1,0 +1,64 @@
+/*
+ * Stages the pinned @tiro-health/web-sdk bundle into form-filler-swing's resources
+ * (GH-24). Run after `npm ci` in this directory:
+ *
+ *   cd build/web-sdk && npm ci --ignore-scripts && node copy-bundle.mjs
+ *
+ * Copies the pinned bundle to
+ * form-filler-swing/src/main/resources/health/tiro/formfiller/swing/tiro-web-sdk.iife.js
+ * and writes web-sdk.version.json ({ version, sha256 }) beside it — both committed, both
+ * packaged into the jar. The version is generated from the installed package, never
+ * hand-written, so the version in the served file name provably describes the bytes shipped.
+ *
+ * Fails hard on any mismatch between the pin and the installed package: a staged bundle
+ * that doesn't match build/web-sdk/package.json would silently ship an unvalidated pairing.
+ */
+import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+const pin = JSON.parse(readFileSync(join(here, "package.json"), "utf8"));
+const pinnedVersion = pin.dependencies?.["@tiro-health/web-sdk"];
+if (!pinnedVersion || !/^\d+\.\d+\.\d+/.test(pinnedVersion)) {
+    throw new Error(`build/web-sdk/package.json must pin an exact @tiro-health/web-sdk version; found: ${pinnedVersion}`);
+}
+
+const installedDir = join(here, "node_modules", "@tiro-health", "web-sdk");
+if (!existsSync(installedDir)) {
+    throw new Error("@tiro-health/web-sdk is not installed. Run `npm ci` in build/web-sdk first (requires GitHub Packages read auth — see build/web-sdk/README.md).");
+}
+
+const installed = JSON.parse(readFileSync(join(installedDir, "package.json"), "utf8"));
+if (installed.version !== pinnedVersion) {
+    throw new Error(`Installed @tiro-health/web-sdk ${installed.version} does not match the pin ${pinnedVersion}. Run \`npm ci\` (not \`npm install\`) so the lockfile wins.`);
+}
+
+const bundleSrc = join(installedDir, "dist", "tiro-web-sdk.iife.js");
+if (!existsSync(bundleSrc)) {
+    throw new Error(`Pinned package has no dist/tiro-web-sdk.iife.js: ${bundleSrc}`);
+}
+
+const resources = join(
+    here, "..", "..",
+    "form-filler-swing", "src", "main", "resources", "health", "tiro", "formfiller", "swing");
+mkdirSync(resources, { recursive: true });
+
+copyFileSync(bundleSrc, join(resources, "tiro-web-sdk.iife.js"));
+
+// The manifest records the bundle's hash as well as its version, and WebSdkAssetsTest
+// verifies it. Both files are committed rather than generated at build time, so they are two
+// things a commit can separate: taking the small manifest from one side of a conflict and the
+// ~6 MB bundle from the other leaves a self-consistent lie — pin and manifest agree, and the
+// harness then serves stale bytes at a URL naming the new version. npm's package-lock
+// integrity used to make that impossible by construction; committing the file gave that away,
+// and the hash is what buys it back.
+const sha256 = createHash("sha256").update(readFileSync(bundleSrc)).digest("hex");
+writeFileSync(
+    join(resources, "web-sdk.version.json"),
+    JSON.stringify({ version: pinnedVersion, sha256 }) + "\n"
+);
+
+console.log(`Staged @tiro-health/web-sdk ${pinnedVersion} (sha256 ${sha256.slice(0, 12)}…) into form-filler-swing resources.`);

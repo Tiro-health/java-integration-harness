@@ -42,6 +42,7 @@
         <module>form-filler-swing</module>
         <module>form-filler-swing-jxbrowser</module>
         <module>form-filler-swing-equo</module>
+        <module>sdc-compat</module>
         <module>sdc-client-core</module>
         <module>sdc-client-r5</module>
     </modules>
@@ -84,6 +85,11 @@
                 <version>${project.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>health.tiro</groupId>
+                <artifactId>sdc-compat</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>health.tiro</groupId>
                 <artifactId>sdc-client-core</artifactId>

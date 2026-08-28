@@ -1,0 +1,13 @@
+# Normalize line endings for text files by default.
+* text=auto
+
+# The vendored web-sdk bundle (GH-24). `binary` is -text -diff -merge, and all three matter
+# for a ~6 MB minified file that is committed rather than generated:
+#   -text   it has no NUL bytes, so `text=auto` classifies it as TEXT and rewrites line
+#           endings on checkout. A release cut from a Windows checkout would then package
+#           CRLF bytes whose sha256 no longer matches web-sdk.version.json.
+#   -merge  two branches each bumping the pin would otherwise be 3-way TEXT-merged, and
+#           non-overlapping hunks merge *cleanly* — producing a splice of two versions that
+#           the pin/manifest check cannot see, because both of those are separate files.
+#   -diff   6 MB of minified JS in a diff helps nobody.
+form-filler-swing/src/main/resources/health/tiro/formfiller/swing/tiro-web-sdk.iife.js binary

@@ -18,6 +18,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>health.tiro</groupId>
+            <artifactId>sdc-compat</artifactId>
+        </dependency>
+        <dependency>
             <groupId>ca.uhn.hapi.fhir</groupId>
             <artifactId>hapi-fhir-base</artifactId>
         </dependency>

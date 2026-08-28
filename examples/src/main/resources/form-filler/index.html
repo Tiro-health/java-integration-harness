@@ -1,4 +1,13 @@
 <!doctype html>
+<!--
+    STANDALONE browser demo — not loaded by the harness, and not built by any example module.
+    It drives <tiro-form-filler> and TiroWebSdk.SDCClient directly from a CDN script tag, which
+    is why the tag at the bottom of this file still exists.
+
+    A page the harness loads must NOT have that tag: form-filler-swing embeds the validated
+    tiro-web-sdk and the bridge injects it (GH-24), and a page that loads its own copy has its
+    session refused with a WebSdkLoadException. See the README's "The embedded frontend".
+-->
 <html lang="en">
     <head>
         <meta charset="UTF-8" />

@@ -1,0 +1,8 @@
+{
+  "name": "web-sdk-pin",
+  "private": true,
+  "description": "Pins the exact @tiro-health/web-sdk version that form-filler-swing embeds and serves (GH-24). Single source of truth: copy-bundle.mjs stages this version's bundle into the module's resources, its version goes into the served file name for cache-busting, and CI type-checks the shipped bridge against it.",
+  "dependencies": {
+    "@tiro-health/web-sdk": "0.3.3"
+  }
+}

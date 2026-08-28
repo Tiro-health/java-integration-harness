@@ -6,6 +6,9 @@
 
 interface Window {
   __swmBridgeLoaded?: boolean;
+  // Defined by BridgeScriptLoader's preamble: the file:// URL of the embedded
+  // @tiro-health/web-sdk bundle the bridge injects (GH-24).
+  __tiroSdkUrl?: string;
   swmReceiveMessage?: (jsonStr: string) => void;
   SmartWebMessaging?: any;
 }

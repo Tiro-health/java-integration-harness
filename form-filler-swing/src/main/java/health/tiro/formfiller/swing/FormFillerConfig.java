@@ -5,7 +5,7 @@ package health.tiro.formfiller.swing;
  * Use {@link #builder()} to create instances.
  *
  * <p>Either provide a custom {@code targetUrl} or let the library generate a default page
- * by specifying {@code sdcEndpointAddress} (and optionally {@code sdkUrl}).
+ * by specifying {@code sdcEndpointAddress}.
  *
  * <pre>{@code
  * // Use the built-in default page
@@ -13,33 +13,29 @@ package health.tiro.formfiller.swing;
  *     .sdcEndpointAddress("http://localhost:8000/fhir/r5")
  *     .build();
  *
- * // Or bring your own page
+ * // Or bring your own page — it must NOT load tiro-web-sdk itself
  * FormFillerConfig config = FormFillerConfig.builder()
- *     .targetUrl("https://your-form-app.com/form-filler.html")
+ *     .targetUrl("file:///opt/ehr/form-filler.html")
  *     .build();
  * }</pre>
+ *
+ * <p>There is no SDK-URL option: the harness embeds and serves the exact
+ * {@code @tiro-health/web-sdk} bundle it was validated against, and the bridge injects it
+ * (GH-24). A page that loads its own copy — or one the embedded bundle cannot reach, such as
+ * a page served over http(s), which may not load a {@code file://} script — fails the
+ * handshake with a {@link WebSdkLoadException}.
  */
 public class FormFillerConfig {
-
-    /**
-     * Default frontend bundle: the floating {@code latest} channel. Note: the save-draft
-     * intent ({@code requestSubmit("save-draft")}) requires {@code tiro-web-sdk >= 0.3.0} —
-     * on older versions the draft status is ignored and the form finalizes instead.
-     */
-    static final String DEFAULT_SDK_URL =
-        "https://cdn.tiro.health/sdk/latest/tiro-web-sdk.iife.js";
 
     private final String targetUrl;
     private final String sdcEndpointAddress;
     private final String dataEndpointAddress;
-    private final String sdkUrl;
     private final long handshakeTimeoutSeconds;
 
     private FormFillerConfig(Builder builder) {
         this.targetUrl = builder.targetUrl;
         this.sdcEndpointAddress = builder.sdcEndpointAddress;
         this.dataEndpointAddress = builder.dataEndpointAddress;
-        this.sdkUrl = builder.sdkUrl;
         this.handshakeTimeoutSeconds = builder.handshakeTimeoutSeconds;
     }
 
@@ -55,10 +51,6 @@ public class FormFillerConfig {
         return dataEndpointAddress;
     }
 
-    public String getSdkUrl() {
-        return sdkUrl;
-    }
-
     public long getHandshakeTimeoutSeconds() {
         return handshakeTimeoutSeconds;
     }
@@ -71,14 +63,17 @@ public class FormFillerConfig {
         private String targetUrl;
         private String sdcEndpointAddress;
         private String dataEndpointAddress;
-        private String sdkUrl = DEFAULT_SDK_URL;
         private long handshakeTimeoutSeconds = 30;
 
         private Builder() {}
 
         /**
          * Set the URL to load in the embedded browser.
-         * When set, {@code sdcEndpointAddress} and {@code sdkUrl} are ignored.
+         * When set, {@code sdcEndpointAddress} and {@code dataEndpointAddress} are ignored —
+         * the page is responsible for its own {@code <tiro-form-filler>} attributes.
+         *
+         * <p>The page must not load {@code tiro-web-sdk} itself, and must be reachable by a
+         * {@code file://} script (so: a local page). See the class javadoc.
          */
         public Builder targetUrl(String targetUrl) {
             this.targetUrl = targetUrl;
@@ -100,15 +95,6 @@ public class FormFillerConfig {
          */
         public Builder dataEndpointAddress(String dataEndpointAddress) {
             this.dataEndpointAddress = dataEndpointAddress;
-            return this;
-        }
-
-        /**
-         * Set the Tiro Web SDK script URL used by the default page.
-         * Defaults to the latest dev build on the Tiro CDN.
-         */
-        public Builder sdkUrl(String sdkUrl) {
-            this.sdkUrl = sdkUrl;
             return this;
         }
 

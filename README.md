@@ -88,9 +88,9 @@ SmartMessageHandler handler = new SmartMessageHandler();
 FormFillerConfig config = FormFillerConfig.builder()
     .sdcEndpointAddress("http://localhost:8000/fhir/r5")
     .build();
-// Or bring your own page:
+// Or bring your own page (local file, and no tiro-web-sdk script tag — see below):
 // FormFillerConfig config = FormFillerConfig.builder()
-//     .targetUrl("https://your-form-app.com/form-filler.html")
+//     .targetUrl("file:///opt/ehr/form-filler.html")
 //     .build();
 FormFiller viewer = new FormFiller(config, browser, handler);
 
@@ -187,6 +187,7 @@ handler.sendSdcConfigureContextAsync(
 | Swing | `form-filler-swing` | `FormFiller` controller + `EmbeddedBrowser` interface. Depends on core. |
 | Swing JxBrowser | `form-filler-swing-jxbrowser` | JxBrowser adapter. Depends on swing + JxBrowser (provided). |
 | Swing Equo | `form-filler-swing-equo` | Equo Chromium adapter. Depends on swing + Equo Chromium (provided). |
+| SDC Compatibility | `sdc-compat` | The minimum SDC server version this release supports, and the probe that reads a live server. Jackson only — no HAPI, no HTTP client. |
 | SDC Client Core | `sdc-client-core` | FHIR-version-agnostic core for the stateless SDC server operations. Depends on `hapi-fhir-base` + Apache HttpClient. |
 | SDC Client R5 | `sdc-client-r5` | FHIR R5 binding: `SdcClient` for `$validate`/`$extract`. Depends on core + `hapi-fhir-structures-r5`. |
 
@@ -208,6 +209,23 @@ try (SdcClient sdc = new SdcClient("https://host/fhir/r5")) {   // optionally pa
 - A validation *failure* comes back as `OperationOutcome` issues; transport/server errors (non-2xx) throw `SdcOperationException` (carrying the status + any server outcome). Responses are parsed leniently, tolerating elements/codes a newer server emits.
 - **Use one SDC base for both**: `baseUrl` here and the viewer's `FormFillerConfig.sdcEndpointAddress` are the same concept — the SDC server. A host that embeds the form **and** calls the client should configure the address once and pass it to both. The client has no default base (you must pass one) to avoid silently diverging from a configured viewer.
 - `$extract` returns a transaction `Bundle`: the resources the answers produce (Tiro's template questionnaires yield a `Composition` with per-section narrative; definition-based ones yield structured resources), plus the source QR and a `Provenance`. `$populate` is tracked separately (#20).
+
+## SDC server version
+
+The harness embeds its frontend (see [The embedded frontend](#the-embedded-frontend)), so the **SDC server is the only component that can change underneath a pinned release** — you run and upgrade your own. It gets the one runtime version check.
+
+> **Integrator story:** pin the harness artifact; run an SDC server at or above the minimum in its release notes. Your page is branding only.
+
+`SdcCompatibility.minimumSdcVersion()` (module `sdc-compat`) is the floor this release ships. Both entry points check it once, against `GET {sdcEndpointAddress}/metadata` → `CapabilityStatement.software.version`:
+
+| Where | When | Exposed as |
+|---|---|---|
+| `FormFiller` | on construction, on a background thread | `getSdcServerVersionCheck()` |
+| `SdcClient` | before the first operation, over the same HTTP client | `getServerVersionCheck()` |
+
+**It reports; it does not refuse.** A server below the floor is logged as an actionable warning (and captured to Sentry when Sentry is configured); an unreadable version is logged as a diagnostic. Neither stops a form from launching or an operation from running. Two reasons: enforcement and the floor ship in the same artifact, so a deployment that hasn't adopted a raised floor hasn't adopted its enforcement either; and the current floor is the first server version that answers the probe at all, so a refusal could only ever fire on a mistake. The refusal arms in the release that first raises the floor for a real reason — the javadoc on `minimumSdcVersion()` says what to add.
+
+The version is only used when the document identifies itself as the SDC server (`software.name`). That matters: on a server predating the metadata route, `{base}/metadata` falls into the data tunnel and the *hospital's own* FHIR server answers with a perfectly parseable version that says nothing about the SDC server. Anything unattributable, unreachable, or outside the version grammar (`dev`, a PR checkpoint id) reads as **unknown** and is let through — never as "too old".
 
 ## Message Types Supported
 
@@ -235,13 +253,35 @@ Each adapter injects the bridge and initializes it with a transport-specific `se
 
 Java→JS messages are delivered via `window.swmReceiveMessage(json)`, which the bridge registers globally.
 
-### Frontend version compatibility
+### The embedded frontend
 
-The harness is version-agnostic about `tiro-web-sdk` (you set `sdkUrl`/`targetUrl`; the default is the floating `cdn.tiro.health/sdk/latest`).
+**You pick one version — the harness.** It embeds the exact `@tiro-health/web-sdk` bundle it was validated against, extracts it next to the page, and the bridge injects it. There is no SDK URL to configure, no CDN egress, and no way for the bridge and the element to drift apart.
 
-**Pinning recommendation:** if you pin the integration harness (Maven artifact) to a fixed version, set `sdkUrl` to a matching pinned `tiro-web-sdk` version (`sdk/vX.Y.Z/`) rather than the floating `sdk/latest`. A pinned harness ships a fixed bridge that was validated against a specific frontend (each harness release records the version it validated against); tracking `latest` lets a future frontend release drift the bridge contract out from under your pinned bridge. Track `latest` only if you also track the latest harness.
+- The pin lives in [`build/web-sdk/package.json`](build/web-sdk/README.md); the bundle and its generated `web-sdk.version.json` are committed under `form-filler-swing/src/main/resources/`, so `git clone && mvn package` needs no token.
+- The bridge is type-checked against that exact version on every PR and again at release ([`build/bridge-contract/`](build/bridge-contract/README.md)).
+- `save-draft` (`requestSubmit("save-draft")`) maps to the element's `submit({ status: "in-progress" })`, added in web-sdk 0.3.0. The embedded bundle is well past that, so the option works — this is no longer a floor you have to check.
 
-One floor to know: **save-draft** (`requestSubmit("save-draft")` / `SmartWebMessaging.saveProgress()`) requires **`tiro-web-sdk` >= 0.3.0** — it maps to the frontend's `submit({ status: "in-progress" })`, an option added in 0.3.0. On older versions the option is ignored and the form **finalizes** instead. Plain finalize (`requestSubmit()`) works on all versions. The `build/bridge-contract/` type-check guards this contract against the live `tiro-web-sdk@latest`.
+**Your page must not load `tiro-web-sdk` itself.** With a custom `targetUrl`, delete the `<script src="…tiro-web-sdk…">` tag; the page is markup and branding only.
+
+The bridge reports what actually loaded in the handshake, and the harness **refuses the session** when the page ran its own copy (`collision`) or the embedded bundle could not load (`error`):
+
+```java
+viewer.addFormFillerListener(new FormFillerListener() {
+    @Override
+    public void onWebSdkLoadFailed(WebSdkLoadException e) {
+        // e.getReason() is "collision" or "error"; e.getMessage() says what to fix
+    }
+});
+
+// or, equivalently, on the handshake you were already awaiting:
+viewer.waitForHandshake().get();   // throws WebSdkLoadException
+```
+
+Queued outbound messages fail with the same exception rather than waiting on a handshake that will never complete. `viewer.getPageWebSdkVersion()` returns the version the element reported — diagnostics only: the refusal is decided on *what the bridge did*, not on a version the page tells us about itself.
+
+**The page is told as well.** A refused handshake is answered with an error, so the bridge stops retrying and logs the failure instead of reporting `[SWM] Connected` over a form that will never render — which is what an integrator debugging a custom page sees first. The refusal is also sticky: reloading the same page will not clear it, and only `viewer.navigate(url)` resets it.
+
+One consequence worth knowing: a `file://` script only loads into a `file://` document, so a `targetUrl` served over **http(s) cannot run the embedded bundle** and is refused. Use the generated page (`sdcEndpointAddress`) or ship your page as a local file.
 
 ## Examples
 
