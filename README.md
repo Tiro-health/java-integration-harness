@@ -279,6 +279,8 @@ viewer.waitForHandshake().get();   // throws WebSdkLoadException
 
 Queued outbound messages fail with the same exception rather than waiting on a handshake that will never complete. `viewer.getPageWebSdkVersion()` returns the version the element reported — diagnostics only: the refusal is decided on *what the bridge did*, not on a version the page tells us about itself.
 
+**The page is told as well.** A refused handshake is answered with an error, so the bridge stops retrying and logs the failure instead of reporting `[SWM] Connected` over a form that will never render — which is what an integrator debugging a custom page sees first. The refusal is also sticky: reloading the same page will not clear it, and only `viewer.navigate(url)` resets it.
+
 One consequence worth knowing: a `file://` script only loads into a `file://` document, so a `targetUrl` served over **http(s) cannot run the embedded bundle** and is refused. Use the generated page (`sdcEndpointAddress`) or ship your page as a local file.
 
 ## Examples

@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
  * <pre>{@code
  * var handler = new health.tiro.swm.r5.SmartMessageHandler();
  * var browser = new JxBrowserAdapter(JxBrowserConfig.builder().licenseKey("...").build());
- * var config = FormFillerConfig.builder().targetUrl("https://...").build();
+ * var config = FormFillerConfig.builder().sdcEndpointAddress("https://host/fhir/r5").build();
  * var viewer = new FormFiller(config, browser, handler);
  *
  * viewer.addFormFillerListener(new FormFillerListener() {
@@ -408,7 +408,9 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
 
     /**
      * Navigate the browser to a different URL.
-     * Resets the handshake state so outbound messages are queued until the new page completes its handshake.
+     * Resets the handshake state so outbound messages are queued until the new page completes
+     * its handshake, and clears a standing {@link WebSdkLoadException} — a refusal describes
+     * the page that caused it, and this is the one action that loads a different one.
      */
     public void navigate(String url) {
         handshakeReceived = new CompletableFuture<>();

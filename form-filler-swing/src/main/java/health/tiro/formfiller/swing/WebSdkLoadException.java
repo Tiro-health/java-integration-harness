@@ -5,9 +5,15 @@ package health.tiro.formfiller.swing;
  * loaded its own copy ({@code collision}) or the embedded bundle failed to load
  * ({@code error}).
  *
- * <p>Terminal for this {@link FormFiller}: {@link FormFiller#waitForHandshake()} fails with
- * it, queued outbound messages fail with it, and {@link FormFillerListener#onWebSdkLoadFailed}
- * is called. Fix the page or the environment and create a new viewer.
+ * <p>Terminal for the page that caused it: {@link FormFiller#waitForHandshake()} fails with
+ * it, queued outbound messages fail with it, {@link FormFillerListener#onWebSdkLoadFailed} is
+ * called, and the page's own handshake is answered with an error so it stops rather than
+ * reporting itself connected. The refusal is remembered, so reloading the same page cannot
+ * clear it.
+ *
+ * <p>Two ways out, both of which mean loading different content: create a new viewer, or call
+ * {@link FormFiller#navigate(String)} — an explicit host action, and the only thing that
+ * resets the refusal.
  */
 public class WebSdkLoadException extends IllegalStateException {
 

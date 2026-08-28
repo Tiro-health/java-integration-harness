@@ -222,6 +222,15 @@ public abstract class AbstractSmartMessageHandler {
     private SmartMessageResponse handleHandshake(SmartMessageRequest message) {
         logger.debug("Invoking HandshakeReceived event for MessageId: {}", message.getMessageId());
 
+        // A listener that THROWS refuses the handshake: handleRequestMessage catches it and
+        // answers with an error payload instead of this success one. FormFiller relies on that
+        // to tell a page it is not running the embedded web-sdk (GH-24) — it is the only channel
+        // that reaches the page, so do not "tidy" that catch into swallowing listener
+        // exceptions without replacing this path.
+        //
+        // Consequence worth knowing: a throwing listener stops the ones registered after it.
+        // That is the intended precedence for a refusal, and the reason FormFiller registers
+        // its own listener before a host gets the chance to.
         HandshakeReceivedEvent event = new HandshakeReceivedEvent(this, message, message.getPayload());
         listeners.forEach(l -> l.onHandshakeReceived(event));
         logger.debug("HandshakeReceived event invoked for MessageId: {}", message.getMessageId());
