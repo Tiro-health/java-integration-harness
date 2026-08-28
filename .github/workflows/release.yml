@@ -6,22 +6,18 @@ on:
       - 'v*' # Triggers on v1.0.3, v1.1.0, etc.
 
 jobs:
-  # Release gate: the bridge must match the current stable frontend
-  # (@tiro-health/web-sdk@latest) before we publish. If it doesn't, this job fails and
-  # `publish` (which needs it) is skipped — the release is blocked.
+  # Release gate: the bridge must match the tiro-web-sdk bundle this release embeds and
+  # serves (GH-24) before we publish. If it doesn't, this job fails and `publish` (which
+  # needs it) is skipped — the release is blocked.
   #
-  # This is intentionally BLOCKING. While the save-draft submit({ status }) API is only
-  # on web-sdk >= 0.3.0 (not yet on the `latest` dist-tag), this gate fails and blocks
-  # releases by design — until 0.3.0 is promoted to `latest`, or the bridge stops calling
-  # an API absent from stable. See build/bridge-contract/README.md.
+  # The version checked is the pin in build/web-sdk/package.json, not a dist-tag: the
+  # released jar carries that exact bundle, so it is the only pairing a deployment can run.
+  # See build/bridge-contract/README.md.
   contract-check:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
-    defaults:
-      run:
-        working-directory: build/bridge-contract
     env:
       NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -34,18 +30,29 @@ jobs:
           scope: '@tiro-health'
 
       - name: Install tooling
+        working-directory: build/bridge-contract
         run: npm ci
 
-      - name: Install @tiro-health/web-sdk@latest
-        run: npm install --no-save @tiro-health/web-sdk@latest
-
-      - name: Record validated SDK version
+      # Belt-and-braces alongside WebSdkAssetsTest: a release must never ship a jar whose
+      # staged bundle disagrees with the pin the bridge was type-checked against.
+      - name: Resolve and verify the embedded SDK version
+        id: pin
         run: |
-          VER=$(npm view @tiro-health/web-sdk version)
-          echo "Validating bridge against tiro-web-sdk@$VER (latest dist-tag)"
-          echo "Bridge contract validated against **tiro-web-sdk v$VER** (this version or higher, same major, supported)." >> "$GITHUB_STEP_SUMMARY"
+          PIN=$(node -p "require('./build/web-sdk/package.json').dependencies['@tiro-health/web-sdk']")
+          STAGED=$(node -p "require('./form-filler-swing/src/main/resources/health/tiro/formfiller/swing/web-sdk.version.json').version")
+          if [ "$PIN" != "$STAGED" ]; then
+            echo "::error::The pin ($PIN) and the staged bundle ($STAGED) disagree. Run build/web-sdk/copy-bundle.mjs and commit the result."
+            exit 1
+          fi
+          echo "version=$PIN" >> "$GITHUB_OUTPUT"
+          echo "Bridge contract validated against the **embedded tiro-web-sdk v$PIN**." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install the pinned @tiro-health/web-sdk
+        working-directory: build/bridge-contract
+        run: npm install --no-save "@tiro-health/web-sdk@${{ steps.pin.outputs.version }}"
 
       - name: Type-check bridge against frontend contract
+        working-directory: build/bridge-contract
         run: npm run typecheck
 
   publish:

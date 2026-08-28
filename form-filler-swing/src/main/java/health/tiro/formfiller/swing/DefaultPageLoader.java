@@ -11,6 +11,10 @@ import java.nio.file.Path;
 /**
  * Loads the default form-filler HTML template from the classpath,
  * replaces placeholders, writes it to a temp file, and returns a {@code file://} URI.
+ *
+ * <p>The page carries no SDK script tag — the bridge injects the embedded
+ * {@code @tiro-health/web-sdk} bundle (GH-24). The page is written into the same folder the
+ * bundle is extracted to, so the two are same-directory {@code file://} siblings.
  */
 public final class DefaultPageLoader {
 
@@ -27,11 +31,10 @@ public final class DefaultPageLoader {
      *
      * @param sdcEndpointAddress  the SDC FHIR endpoint URL
      * @param dataEndpointAddress the FHIR data endpoint URL (nullable)
-     * @param sdkUrl              the Tiro Web SDK script URL
      * @return a {@code file://} URI pointing to the generated HTML file
      */
-    public static String createPage(String sdcEndpointAddress, String dataEndpointAddress, String sdkUrl) {
-        String key = sdcEndpointAddress + "|" + dataEndpointAddress + "|" + sdkUrl;
+    public static String createPage(String sdcEndpointAddress, String dataEndpointAddress) {
+        String key = sdcEndpointAddress + "|" + dataEndpointAddress;
         if (key.equals(cachedKey) && cachedUri != null) {
             return cachedUri;
         }
@@ -45,9 +48,9 @@ public final class DefaultPageLoader {
                     ? " data-endpoint-address=\"" + dataEndpointAddress + "\""
                     : "";
             html = html.replace("{{dataEndpointAddressAttr}}", dataAttr);
-            html = html.replace("{{sdkUrl}}", sdkUrl);
             try {
-                Path tempFile = Files.createTempFile("tiro-form-filler-", ".html");
+                Path tempFile = Files.createTempFile(
+                        WebSdkAssets.getFolder(), "tiro-form-filler-", ".html");
                 tempFile.toFile().deleteOnExit();
                 Files.write(tempFile, html.getBytes(StandardCharsets.UTF_8));
                 cachedKey = key;

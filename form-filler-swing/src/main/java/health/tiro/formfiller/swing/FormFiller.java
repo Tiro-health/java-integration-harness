@@ -117,7 +117,7 @@ public class FormFiller<H extends AbstractSmartMessageHandler> implements AutoCl
         // Load the target URL (use default page if no custom URL is configured)
         String url = config.getTargetUrl();
         if (url == null || url.trim().isEmpty()) {
-            url = DefaultPageLoader.createPage(config.getSdcEndpointAddress(), config.getDataEndpointAddress(), config.getSdkUrl());
+            url = DefaultPageLoader.createPage(config.getSdcEndpointAddress(), config.getDataEndpointAddress());
         }
         browser.loadUrl(url);
     }

@@ -22,7 +22,6 @@ import java.util.Map;
 public class CompleteExample {
     private static final String SDC_SERVER = "http://localhost:8000/fhir/r5";
     private static final String FHIR_SERVER = "http://fhir-server:5826/fhir/r5";
-    private static final String SDK_URL = "https://cdn.tiro.health/sdk-dev/v0.2.2-dev.4/tiro-web-sdk.iife.js";
 
     private static final String PATIENT_ID = "test-patient-001";
 
@@ -52,7 +51,6 @@ public class CompleteExample {
             FormFillerConfig config = FormFillerConfig.builder()
                     .sdcEndpointAddress(SDC_SERVER)
                     .dataEndpointAddress(FHIR_SERVER)
-                    .sdkUrl(SDK_URL)
                     .build();
             FormFiller filler = new FormFiller(config, browser, handler);
 

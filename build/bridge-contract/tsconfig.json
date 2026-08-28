@@ -7,6 +7,10 @@
   // strict is intentionally OFF: we are not type-checking the bridge's internals,
   // only its calls into <tiro-form-filler>. Object-literal excess-property checking
   // (which catches the {intent}/{status} mismatch) is on regardless of strict.
+  //
+  // It also guards the handshake's version read: describeClient() casts the registered
+  // constructor to the SDK's own class, so a release that drops `static version` turns
+  // this red rather than silently reporting null to the host forever.
   "compilerOptions": {
     "noEmit": true,
     "allowJs": true,

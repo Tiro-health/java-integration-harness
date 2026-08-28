@@ -4,6 +4,8 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Tiro.health Form Filler</title>
+        <!-- No SDK script tag: the harness embeds the validated tiro-web-sdk and the bridge
+             injects it (GH-24). Do not add one — a page that loads its own copy is refused. -->
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -12,6 +14,5 @@
     </head>
     <body>
         <tiro-form-filler sdc-endpoint-address="{{sdcEndpointAddress}}"{{dataEndpointAddressAttr}}></tiro-form-filler>
-        <script src="{{sdkUrl}}"></script>
     </body>
 </html>

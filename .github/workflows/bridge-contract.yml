@@ -1,6 +1,6 @@
 name: Bridge contract
 
-# Static type-check of the shipped tiro-swm-bridge.js against the live
+# Static type-check of the shipped tiro-swm-bridge.js against the
 # @tiro-health/web-sdk (<tiro-form-filler>) types. Catches bridge<->frontend
 # drift such as the submit({ intent }) vs submit({ status }) bug. See
 # build/bridge-contract/README.md.
@@ -10,6 +10,7 @@ on:
     paths:
       - 'form-filler-swing/src/main/resources/health/tiro/formfiller/swing/tiro-swm-bridge.js'
       - 'build/bridge-contract/**'
+      - 'build/web-sdk/package.json'
       - '.github/workflows/bridge-contract.yml'
   push:
     branches: [main]
@@ -19,7 +20,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  typecheck:
+  # The blocking check: the bridge must match the SDK version the harness actually embeds
+  # and serves (GH-24), which is the only version any deployment can be running.
+  pinned:
     runs-on: ubuntu-latest
 
     # Ephemeral GITHUB_TOKEN reads the package from GitHub Packages — no stored
@@ -28,17 +31,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-
-    # TEMPORARY: the bridge's save-draft uses submit({ status }), added in web-sdk
-    # 0.3.0, which is not yet on the `latest` dist-tag (stable is 0.2.3). Until 0.3.0
-    # is promoted to `latest` this check is expectedly red; allow it to fail so it
-    # doesn't block PRs. When 0.3.0 is `latest`: remove this line and make the job a
-    # required status check. (Nightly runs still surface the real status in logs.)
-    continue-on-error: true
-
-    defaults:
-      run:
-        working-directory: build/bridge-contract
 
     # The project .npmrc references ${NODE_AUTH_TOKEN}; set it for every step so npm
     # never trips on an unset var. It's the ephemeral job token — no stored secret.
@@ -55,12 +47,63 @@ jobs:
           scope: '@tiro-health'
 
       - name: Install tooling
+        working-directory: build/bridge-contract
         run: npm ci
 
-      # Floating: always check against the current published `latest`, so a frontend
-      # release that moves the contract turns this red.
-      - name: Install @tiro-health/web-sdk@latest
-        run: npm install --no-save @tiro-health/web-sdk@latest
+      # Read from the pin rather than restating it: build/web-sdk/package.json is the
+      # single source of truth for the embedded version (copy-bundle.mjs stages it,
+      # WebSdkAssetsTest asserts the staged manifest matches it).
+      - name: Resolve the embedded SDK version
+        id: pin
+        run: |
+          VER=$(node -p "require('./build/web-sdk/package.json').dependencies['@tiro-health/web-sdk']")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Checking the bridge against the embedded tiro-web-sdk $VER" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install the pinned @tiro-health/web-sdk
+        working-directory: build/bridge-contract
+        run: npm install --no-save "@tiro-health/web-sdk@${{ steps.pin.outputs.version }}"
 
       - name: Type-check bridge against frontend contract
+        working-directory: build/bridge-contract
+        run: npm run typecheck
+
+  # Informational: does the bridge still match whatever the frontend has released since the
+  # pin was set? A red run here breaks nothing — no deployment runs `latest`, because the
+  # harness serves its own bundle — but it is the early warning that the next pin bump will
+  # need bridge work. Nightly and on demand only; there is nothing for a PR to act on.
+  latest-drift:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    permissions:
+      contents: read
+      packages: read
+
+    defaults:
+      run:
+        working-directory: build/bridge-contract
+
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@tiro-health'
+
+      - name: Install tooling
+        run: npm ci
+
+      - name: Install @tiro-health/web-sdk@latest
+        run: |
+          npm install --no-save @tiro-health/web-sdk@latest
+          echo "Drift check against tiro-web-sdk@$(npm view @tiro-health/web-sdk version) (latest dist-tag)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Type-check bridge against the current latest
         run: npm run typecheck

@@ -2,34 +2,31 @@
 
 Type-checks the **actual shipped** `form-filler-swing/src/main/resources/health/tiro/formfiller/swing/tiro-swm-bridge.js`
 against the published TypeScript types of `@tiro-health/web-sdk` — the `<tiro-form-filler>` web component the
-bridge drives. It exists to catch **drift between the bridge and the external frontend**, e.g. a
+bridge drives. It exists to catch **drift between the bridge and the frontend**, e.g. a
 `submit({ intent })`-vs-`submit({ status })` mismatch. The .NET harness shipped exactly that bug
 (Tiro-health/net-integration-harness#19); this guards the identical contract on the Java side.
 
 The bridge file is `include`d by relative path (never copied), so the bytes checked are the bytes shipped.
 
-## Version target: floating `latest` (intentionally)
+## Version target: the embedded pin
 
-CI installs `@tiro-health/web-sdk@latest` fresh on every run — **not** a pinned version. The harness defaults to
-the floating `cdn.tiro.health/sdk/latest` channel (`FormFillerConfig.DEFAULT_SDK_URL`), so the check tracks
-whatever `latest` currently is. A red run with no harness change means **the frontend's `latest` moved the
-contract** — that's the alarm, not a flake.
+CI installs the version pinned in [`../web-sdk/package.json`](../web-sdk/package.json) — the bundle the
+harness embeds and serves (GH-24). That is the only frontend any deployment can be running, so it is the
+only pairing worth blocking a merge or a release on. The pin is read, never restated: bump it in one place
+and this check follows.
 
-## ⚠️ Currently expected to be RED — and why
+Two things it now also guards, beyond the call shapes:
 
-The bridge's `save-draft` path (`requestSubmit("save-draft")` and `SmartWebMessaging.saveProgress()`) calls
-`submit({ status: "in-progress" })`. That option was added in **web-sdk `0.3.0`**, which at time of writing is
-only on the `next`/`rc` channel — stable `latest` is `0.2.3`, whose `submit()` takes **no arguments**. So:
+- `describeClient()` casts the registered element to the SDK's own class before reading
+  `static version`, so a release that drops that field turns this red instead of quietly
+  reporting `null` to the host forever.
+- `submit({ status: "in-progress" })` — the save-draft path. This was expectedly **red** while
+  the harness tracked the floating `latest` channel and stable was `0.2.3`; the pin is `0.3.3`,
+  so it is green, and the workflow's `continue-on-error` is gone.
 
-| target | result |
-|--------|--------|
-| `latest` (0.2.3) | ❌ red — `submit({status})` not in stable yet |
-| `next` (0.3.0-rc) | ✅ green — bridge matches |
-
-This red is **correct**: it reports that `save-draft` does not function against the stable frontend the harness
-loads by default. **Save-draft requires `@tiro-health/web-sdk` >= 0.3.0.** When 0.3.0 is promoted to the `latest`
-dist-tag this check goes green automatically; at that point remove the `continue-on-error` in the workflow and
-make it a required status check.
+A second, **non-blocking** nightly job (`latest-drift`) checks the bridge against
+`@tiro-health/web-sdk@latest`. A red run there breaks nothing — no deployment runs `latest` — but it is the
+early warning that the next pin bump will need bridge work.
 
 ## Running locally
 
@@ -40,7 +37,7 @@ gh auth refresh -h github.com -s read:packages    # one-time, adds the scope
 cd build/bridge-contract
 export NODE_AUTH_TOKEN=$(gh auth token)
 npm ci
-npm install --no-save @tiro-health/web-sdk@latest  # or @next to see it green
+npm install --no-save "@tiro-health/web-sdk@$(node -p "require('../web-sdk/package.json').dependencies['@tiro-health/web-sdk']")"
 npm run typecheck
 ```
 
@@ -49,4 +46,4 @@ must grant this repo Actions read access (GitHub Packages → package → *Manag
 
 ## Follow-up
 
-A heavier **behavioral** smoke test (Playwright, real element from the CDN) is tracked separately in #16.
+A heavier **behavioral** smoke test (real element, dockerized SDC server) is tracked separately in #16.

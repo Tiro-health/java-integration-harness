@@ -88,9 +88,9 @@ SmartMessageHandler handler = new SmartMessageHandler();
 FormFillerConfig config = FormFillerConfig.builder()
     .sdcEndpointAddress("http://localhost:8000/fhir/r5")
     .build();
-// Or bring your own page:
+// Or bring your own page (local file, and no tiro-web-sdk script tag — see below):
 // FormFillerConfig config = FormFillerConfig.builder()
-//     .targetUrl("https://your-form-app.com/form-filler.html")
+//     .targetUrl("file:///opt/ehr/form-filler.html")
 //     .build();
 FormFiller viewer = new FormFiller(config, browser, handler);
 
@@ -235,13 +235,17 @@ Each adapter injects the bridge and initializes it with a transport-specific `se
 
 Java→JS messages are delivered via `window.swmReceiveMessage(json)`, which the bridge registers globally.
 
-### Frontend version compatibility
+### The embedded frontend
 
-The harness is version-agnostic about `tiro-web-sdk` (you set `sdkUrl`/`targetUrl`; the default is the floating `cdn.tiro.health/sdk/latest`).
+**You pick one version — the harness.** It embeds the exact `@tiro-health/web-sdk` bundle it was validated against, extracts it next to the page, and the bridge injects it. There is no SDK URL to configure, no CDN egress, and no way for the bridge and the element to drift apart.
 
-**Pinning recommendation:** if you pin the integration harness (Maven artifact) to a fixed version, set `sdkUrl` to a matching pinned `tiro-web-sdk` version (`sdk/vX.Y.Z/`) rather than the floating `sdk/latest`. A pinned harness ships a fixed bridge that was validated against a specific frontend (each harness release records the version it validated against); tracking `latest` lets a future frontend release drift the bridge contract out from under your pinned bridge. Track `latest` only if you also track the latest harness.
+- The pin lives in [`build/web-sdk/package.json`](build/web-sdk/README.md); the bundle and its generated `web-sdk.version.json` are committed under `form-filler-swing/src/main/resources/`, so `git clone && mvn package` needs no token.
+- The bridge is type-checked against that exact version on every PR and again at release ([`build/bridge-contract/`](build/bridge-contract/README.md)).
+- `save-draft` (`requestSubmit("save-draft")`) maps to the element's `submit({ status: "in-progress" })`, added in web-sdk 0.3.0. The embedded bundle is well past that, so the option works — this is no longer a floor you have to check.
 
-One floor to know: **save-draft** (`requestSubmit("save-draft")` / `SmartWebMessaging.saveProgress()`) requires **`tiro-web-sdk` >= 0.3.0** — it maps to the frontend's `submit({ status: "in-progress" })`, an option added in 0.3.0. On older versions the option is ignored and the form **finalizes** instead. Plain finalize (`requestSubmit()`) works on all versions. The `build/bridge-contract/` type-check guards this contract against the live `tiro-web-sdk@latest`.
+**Your page must not load `tiro-web-sdk` itself.** With a custom `targetUrl`, delete the `<script src="…tiro-web-sdk…">` tag; the page is markup and branding only. The bridge reports what actually loaded in the handshake, and the harness refuses the session with a `WebSdkLoadException` if the page ran its own copy (`collision`) or the embedded bundle could not load (`error`).
+
+One consequence worth knowing: a `file://` script only loads into a `file://` document, so a `targetUrl` served over **http(s) cannot run the embedded bundle** and is refused. Use the generated page (`sdcEndpointAddress`) or ship your page as a local file.
 
 ## Examples
 
