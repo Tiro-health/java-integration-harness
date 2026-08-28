@@ -403,13 +403,25 @@
         resolve(payload);
       }
 
+      // An error ack is the host refusing the session — it does that when the page is not
+      // running the embedded SDK (GH-24). Terminal, not a retry: the host has already decided,
+      // and every further attempt gets the same answer. Swallowing it here (this used to be a
+      // no-op) left the page retrying for the full 30s and then reporting a timeout, which
+      // reads as "the host never answered" — the opposite of what happened.
+      function onRefused(error) {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        reject(error);
+      }
+
       function attempt() {
         if (resolved) return;
         var messageId = generateMessageId();
         attemptIds.push(messageId);
         pendingRequests.set(messageId, {
           resolve: onSuccess,
-          reject: function () {},
+          reject: onRefused,
         });
 
         sendMessage({

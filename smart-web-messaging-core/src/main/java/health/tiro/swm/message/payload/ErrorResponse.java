@@ -6,6 +6,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Represents an error response payload.
  */
 public class ErrorResponse extends ResponsePayload {
+
+    /**
+     * The discriminator the bridge keys on: {@code handleMessage} rejects a pending request
+     * only when {@code payload.$type === "error"}. Without it every error this class describes
+     * was delivered to the page as an ordinary success payload, so a request that failed
+     * resolved as though it had worked — and a refused handshake read as a connected one.
+     */
+    @JsonProperty("$type")
+    public String getType() {
+        return "error";
+    }
+
     
     @JsonProperty("errorMessage")
     private String errorMessage;

@@ -142,9 +142,12 @@ public abstract class SdcClientBase<
      * enforcement is not shipped yet and what to add when the floor is first raised for a real
      * reason.
      *
-     * <p>Only the first caller waits for it, and only for the probe's own 3s deadline; a
+     * <p>Only the first caller waits for it, and its operation is delayed by at most the
+     * probe's connect/read timeout in any realistic case (see
+     * {@link SdcServerVersionProbe#TIMEOUT_MILLISECONDS} for the one case that is not); a
      * concurrent second caller proceeds immediately rather than queueing behind an advisory
-     * check. The probe rides this client's {@link CloseableHttpClient}, so it travels the same
+     * check. These operations are documented as blocking and already carry a 60s socket
+     * timeout, so this is not a new obligation on the caller's thread. The probe rides this client's {@link CloseableHttpClient}, so it travels the same
      * TLS, proxy and timeout path as the operations it guards.
      */
     private void ensureServerVersionChecked() {

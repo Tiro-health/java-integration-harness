@@ -4,12 +4,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -105,10 +109,19 @@ public final class WebSdkAssets {
     // a release, but not during development of the bundle itself, where the version can stay
     // put while the bytes change; keying on the hash makes a stale extraction impossible to
     // reuse rather than something to remember to clear.
+    //
+    // Per USER, because java.io.tmpdir is /tmp on Linux and macOS — shared by every account on
+    // the host, unlike the per-user %TEMP% the .NET harness gets for free on Windows. Two
+    // things go wrong in a shared directory. The first owner's 755 folder makes every later
+    // user's launch fail: DefaultPageLoader writes the generated page in here, so a second
+    // account gets an AccessDeniedException out of the FormFiller constructor. And the path is
+    // derivable from the published jar, so anything already sitting at it is served to the
+    // clinical page as script — which the warm path below would not notice, since it checks
+    // for the file rather than digesting it.
     private static Path extract() {
         readManifest();
         Path folder = Paths.get(System.getProperty("java.io.tmpdir"))
-                .resolve("tiro-form-filler")
+                .resolve("tiro-form-filler-" + userScope())
                 .resolve("web-sdk-" + cachedVersion + "-" + cachedSha256.substring(0, 12));
         Path target = folder.resolve(getBundleFileName());
 
@@ -119,7 +132,7 @@ public final class WebSdkAssets {
             if (!Files.isRegularFile(target)) {
                 byte[] bundle = readResource(BUNDLE_RESOURCE);
                 verifyHash(bundle);
-                Files.createDirectories(folder);
+                createPrivateDirectories(folder);
                 // Write to a unique name and move into place, so a second process navigating
                 // to `target` never observes a partially written bundle.
                 Path temp = folder.resolve(UUID.randomUUID() + ".tmp");
@@ -138,6 +151,40 @@ public final class WebSdkAssets {
                 "Failed to extract the embedded tiro-web-sdk bundle to " + folder, e);
         }
         return folder;
+    }
+
+    // A stable, filesystem-safe component identifying the OS account. Not a security boundary
+    // on its own — the directory mode below is — but it keeps two accounts from contending for
+    // one path even where POSIX permissions don't apply.
+    private static String userScope() {
+        String user = System.getProperty("user.name", "");
+        StringBuilder safe = new StringBuilder(user.length());
+        for (int i = 0; i < user.length() && safe.length() < 32; i++) {
+            char c = user.charAt(i);
+            safe.append(Character.isLetterOrDigit(c) ? c : '-');
+        }
+        // A digest of the raw name disambiguates accounts that sanitize to the same thing, and
+        // covers the empty/absent case.
+        return safe + "-" + sha256(user.getBytes(StandardCharsets.UTF_8)).substring(0, 8);
+    }
+
+    // Owner-only where the filesystem supports it. Applied to each level as it is created —
+    // createDirectories' attribute argument is only honoured for directories it actually
+    // creates, so setting it afterwards is what covers a level someone else got to first.
+    private static void createPrivateDirectories(Path folder) throws IOException {
+        Files.createDirectories(folder);
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return;
+        Set<PosixFilePermission> ownerOnly = PosixFilePermissions.fromString("rwx------");
+        for (Path level = folder; level != null && level.getNameCount() > 0; level = level.getParent()) {
+            try {
+                Files.setPosixFilePermissions(level, ownerOnly);
+            } catch (IOException | UnsupportedOperationException e) {
+                // Someone else owns this level, or the filesystem refused. Nothing to do: the
+                // leaf is what holds the bundle, and a failure there surfaces below.
+                break;
+            }
+            if (level.getFileName().toString().startsWith("tiro-form-filler-")) break;
+        }
     }
 
     // Guards the one thing the staging-time check cannot: bytes that changed after the jar was

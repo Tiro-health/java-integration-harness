@@ -100,6 +100,11 @@ class EmbeddedWebSdkHandshakeTest {
     /** A FormFiller over a browser that renders nothing and records what it was told. */
     private static final class Fixture implements AutoCloseable {
         final List<String> sentToPage = new ArrayList<>();
+        final List<String> handshakeAcks = new ArrayList<>();
+        final java.util.concurrent.atomic.AtomicInteger handshakeCallbacks =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final List<WebSdkLoadException> refusals =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
         final FormFiller<SmartMessageHandler> filler;
         private Function<String, String> incoming;
 
@@ -116,6 +121,10 @@ class EmbeddedWebSdkHandshakeTest {
                     return health.tiro.sdc.compat.SdcVersionCheckResult.unavailable("not probed in this test");
                 }
             };
+            filler.addFormFillerListener(new FormFillerListener() {
+                @Override public void onHandshakeReceived() { handshakeCallbacks.incrementAndGet(); }
+                @Override public void onWebSdkLoadFailed(WebSdkLoadException e) { refusals.add(e); }
+            });
         }
 
         void handshake(String clientFields) {
@@ -123,10 +132,16 @@ class EmbeddedWebSdkHandshakeTest {
         }
 
         void handshakeWithPayload(String payloadJson) {
-            incoming.apply("{\"messageId\":\"" + UUID.randomUUID() + "\","
+            String ack = incoming.apply("{\"messageId\":\"" + UUID.randomUUID() + "\","
                     + "\"messagingHandle\":\"smart-web-messaging\","
                     + "\"messageType\":\"status.handshake\","
                     + "\"payload\":" + payloadJson + "}");
+            handshakeAcks.add(ack);
+        }
+
+        /** Listener callbacks are dispatched via invokeLater; drain the EDT before asserting. */
+        void settle() throws Exception {
+            javax.swing.SwingUtilities.invokeAndWait(() -> {});
         }
 
         @Override
@@ -174,6 +189,90 @@ class EmbeddedWebSdkHandshakeTest {
             f.filler.waitForHandshake().get(5, TimeUnit.SECONDS);
             assertEquals(1, f.sentToPage.size());
             assertTrue(f.sentToPage.get(0).contains("ui.form.requestSubmit"), f.sentToPage.get(0));
+        }
+    }
+
+    /**
+     * The page has to be told. Nothing else in the harness can reach it: without an error ack
+     * the bridge logs "Connected" over a form that will never render, which is what a clinician
+     * would be looking at.
+     */
+    @Test
+    void refusalIsAnsweredWithAnErrorAck() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.handshake("\"source\":\"collision\"");
+
+            String ack = f.handshakeAcks.get(0);
+            assertTrue(ack != null && ack.contains("\"$type\":\"error\""),
+                    "the refused handshake should be acked as an error, got: " + ack);
+        }
+    }
+
+    @Test
+    void refusalNotifiesTheListenerAndSuppressesTheHandshakeCallback() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.handshake("\"source\":\"error\"");
+            f.settle();
+
+            assertEquals(1, f.refusals.size());
+            assertEquals("error", f.refusals.get(0).getReason());
+            assertEquals(0, f.handshakeCallbacks.get(),
+                    "a refused session must not also report a successful handshake");
+        }
+    }
+
+    /**
+     * A refused session is terminal. A page that reloads into a working state must not be able
+     * to announce a handshake the future has already failed — the host would be told the
+     * session is up while every message it sends still fails forever.
+     */
+    @Test
+    void aRefusedSessionStaysRefusedWhenTheNextHandshakeIsClean() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.handshake("\"source\":\"collision\",\"version\":\"0.1.0\"");
+            f.handshake("\"source\":\"embedded\",\"version\":\"" + WebSdkAssets.getVersion() + "\"");
+            f.settle();
+
+            assertEquals(0, f.handshakeCallbacks.get(), "the recovery must not be announced");
+            assertEquals(1, f.refusals.size(), "and the refusal must not be announced twice");
+            assertEquals("collision", expectRefusal(f).getReason());
+            assertTrue(f.handshakeAcks.get(1).contains("\"$type\":\"error\""),
+                    "the second handshake should be refused too, not acked as success");
+        }
+    }
+
+    /**
+     * The other direction: a page that handshakes cleanly and then navigates somewhere that
+     * cannot run the bundle. The refusal is real or it is not — announcing it while messages
+     * keep flowing would be worse than not checking at all.
+     */
+    @Test
+    void aCleanSessionIsNotRetroactivelyRefusedButStaysConsistent() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.handshake("\"source\":\"embedded\",\"version\":\"" + WebSdkAssets.getVersion() + "\"");
+            f.filler.waitForHandshake().get(5, TimeUnit.SECONDS);
+            f.handshake("\"source\":\"error\"");
+            f.settle();
+
+            // The future settled successfully and cannot un-settle, so the listener must not
+            // claim a refusal the two other channels will contradict.
+            assertEquals(1, f.handshakeCallbacks.get());
+            assertTrue(f.refusals.isEmpty(),
+                    "a refusal that cannot be enforced must not be announced");
+        }
+    }
+
+    /** A retried handshake must not multiply the callbacks or the telemetry. */
+    @Test
+    void repeatedCleanHandshakesReportOnce() throws Exception {
+        try (Fixture f = new Fixture()) {
+            String client = "\"source\":\"embedded\",\"version\":\"" + WebSdkAssets.getVersion() + "\"";
+            f.handshake(client);
+            f.handshake(client);
+            f.handshake(client);
+            f.settle();
+
+            assertEquals(1, f.handshakeCallbacks.get());
         }
     }
 

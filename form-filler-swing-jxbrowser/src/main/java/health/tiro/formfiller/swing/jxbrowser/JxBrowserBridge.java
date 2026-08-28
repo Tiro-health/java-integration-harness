@@ -82,8 +82,17 @@ public class JxBrowserBridge implements AutoCloseable {
                 window.putProperty("javaBridge", this);
             }
 
-            // 2. Inject the common bridge JS
-            frame.executeJavaScript(BridgeScriptLoader.getScript());
+            // 2. Inject the common bridge JS. Loading it also extracts the embedded web-sdk,
+            // which can fail on a locked-down desktop (policy or antivirus blocking the temp
+            // folder). Report that: uncaught, it aborts injection silently and the only symptom
+            // is the handshake timing out 30s later, which reads as a page that never answered.
+            try {
+                frame.executeJavaScript(BridgeScriptLoader.getScript());
+            } catch (RuntimeException e) {
+                logger.error("Failed to inject the SWM bridge — the form cannot load. The page "
+                        + "will never complete its handshake.", e);
+                throw e;
+            }
 
             // 3. Initialize with JxBrowser transport
             frame.executeJavaScript(

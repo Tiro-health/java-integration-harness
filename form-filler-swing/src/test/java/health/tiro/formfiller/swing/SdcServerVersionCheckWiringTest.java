@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -69,8 +70,8 @@ class SdcServerVersionCheckWiringTest {
         Probe probe = new Probe(SdcVersionCheckResult.fromReportedVersion("v0.9.39"));
 
         try (FormFiller<SmartMessageHandler> filler = viewer(null, probe)) {
+            assertProbeNeverRuns(probe);
             assertNull(filler.getSdcServerVersionCheck());
-            assertNull(probe.probed.get());
         }
     }
 
@@ -80,9 +81,20 @@ class SdcServerVersionCheckWiringTest {
         Probe probe = new Probe(SdcVersionCheckResult.fromReportedVersion("v0.9.39"));
 
         try (FormFiller<SmartMessageHandler> filler = viewer("/fhir/r5", probe)) {
+            assertProbeNeverRuns(probe);
             assertNull(filler.getSdcServerVersionCheck());
-            assertNull(probe.probed.get());
         }
+    }
+
+    /**
+     * Waits for the probe rather than reading its recorder immediately. Asserting
+     * {@code probed.get() == null} straight after the constructor proves nothing: the probe
+     * runs on its own thread, so that assertion passes just as happily when the guard under
+     * test has been deleted.
+     */
+    private static void assertProbeNeverRuns(Probe probe) throws InterruptedException {
+        assertFalse(probe.done.await(500, TimeUnit.MILLISECONDS),
+                "the probe should not have been started at all");
     }
 
     // ---- helpers ----

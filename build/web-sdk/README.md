@@ -13,7 +13,7 @@ SDK version is not a choice integrators or customers make (see the decision reco
 ## How it reaches the page
 
 `WebSdkAssets` extracts the bundle to
-`$TMPDIR/tiro-form-filler/web-sdk-<version>-<sha12>/tiro-web-sdk.<version>.iife.js`, and
+`$TMPDIR/tiro-form-filler-<user>/web-sdk-<version>-<sha12>/tiro-web-sdk.<version>.iife.js`, and
 `BridgeScriptLoader` prepends `window.__tiroSdkUrl = "file://…"` to the bridge source that
 both browser adapters inject. The bridge creates the `<script>` tag itself; the page — the
 generated default page, or an integrator's own — carries no SDK reference at all.
@@ -22,6 +22,12 @@ The version is in the **file name** because Chromium caches by URL: at a constan
 upgraded harness could keep running the previous release's bundle, exactly the bridge↔element
 skew embedding exists to prevent. The **folder** is keyed by version *and* content hash, so
 iterating on the bundle locally can't reuse a stale extraction either.
+
+It is also **per user and owner-only** (`rwx------` where POSIX applies). On Windows `%TEMP%`
+is already per-account, but `java.io.tmpdir` is `/tmp` on Linux and macOS: a shared folder
+there would let the first account's `755` directory break every later account's launch — the
+generated page is written into it — and would put the served bundle at a path anyone on the
+host could write to before the harness first ran.
 
 A `file://` script only loads into a `file://` document. A page served over http(s) therefore
 cannot run the embedded bundle: the bridge reports `source: "error"` at handshake and the host
@@ -42,8 +48,10 @@ it, all in `WebSdkAssetsTest` (no network, so they run on every `mvn test`):
 1. the bundle is on the classpath and extracts;
 2. the staged manifest's version matches the pin;
 3. the manifest's sha256 matches the actual bytes — which is what replaces npm's `integrity`,
-   thrown away by committing the file. `WebSdkAssets` re-checks it at extraction time too, so
-   a repacked jar is caught in the field as well as in CI.
+   thrown away by committing the file. `WebSdkAssets` also digests the bundle the *first* time
+   it extracts it for a given version, so a repacked jar is caught on a cold start; later
+   starts reuse the extracted file without re-digesting it, which is why that file lives in an
+   owner-only per-user directory rather than a shared one.
 
 `.gitattributes` marks the bundle `binary`. Without it, `text=auto` would classify a file with
 no NUL bytes as text: line endings would be rewritten on a Windows checkout (breaking the

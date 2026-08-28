@@ -40,8 +40,15 @@ import java.net.URL;
 public final class SdcServerVersionProbe {
 
     /**
-     * The probe's deadline. Bounded on purpose: a startup check must not become the reason a
-     * form takes long to appear.
+     * The probe's connect and read timeout. Bounded on purpose: a startup check must not become
+     * the reason a form takes long to appear.
+     *
+     * <p>Note this is per socket operation, not a total deadline — a peer that keeps sending a
+     * trickle of bytes can hold the read loop open past it, bounded then only by
+     * {@code MAX_RESPONSE_BYTES}. Left as-is deliberately: an ordinary unreachable or stalled
+     * server hits the timeout on its first read, and the alternative is a wall-clock budget
+     * threaded through both fetchers to defend against a peer that has to be actively hostile
+     * to reach. Worth revisiting if the check ever gains the power to refuse.</p>
      */
     public static final int TIMEOUT_MILLISECONDS = 3000;
 

@@ -30,6 +30,10 @@ public class ResponsePayload {
 
     @JsonAnySetter
     public void setExtraField(String key, JsonNode value) {
+        // $type is the payload discriminator, declared by the subclasses that have one
+        // (ErrorResponse). Catching it here too would round-trip an inbound payload into a
+        // document with the key twice.
+        if ("$type".equals(key)) return;
         extraFields.put(key, value);
     }
 }

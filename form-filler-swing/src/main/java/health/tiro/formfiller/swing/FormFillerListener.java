@@ -46,6 +46,9 @@ public interface FormFillerListener {
      *
      * <p>Override to surface it in your UI; a host that awaits the handshake already sees it
      * there and needs nothing here.
+     *
+     * @param error why the page was refused; {@code getReason()} is {@code "collision"} or
+     *              {@code "error"}
      */
     default void onWebSdkLoadFailed(WebSdkLoadException error) {}
 }
